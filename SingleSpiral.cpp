@@ -10,16 +10,16 @@ namespace hpcg {
 		for (int i = 0; i < 3; i++)
 			PolygonSmoothing();
 
-		GenerateToolpath();
+		ComputeOffsets();
 
-		for (int i = 0; i < toolpath.size(); i++)
+		for (int i = 0; i < offsets.size(); i++)
 		{
-			std::cout << i << " / " << toolpath.size() << std::endl;
+			std::cout << i << " / " << offsets.size() << std::endl;
 			double entry_d_1 = ComputeNextTurningPoint(entry_d_0, toolpath_size, i);
 			
 			SelectOnePartOffset(i, entry_d_0, entry_d_1, entry_spiral);
 
-			if (i != toolpath.size() - 1)
+			if (i != offsets.size() - 1)
 				entry_d_0 = FindNearestPoint(i + 1, entry_spiral[entry_spiral.size() - 1]);
 		}
 	

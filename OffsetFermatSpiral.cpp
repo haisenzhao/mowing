@@ -8,6 +8,7 @@ namespace hpcg {
 
 	void ToolpathGenerator::CreateMAT()
 	{
+
 	}
 
 	bool CompareTwoDouble(double d0, double d1, double d)
@@ -30,24 +31,22 @@ namespace hpcg {
 
 	void ToolpathGenerator::OffsetBasedFermatSpiral1()
 	{
-
-
-		GenerateToolpath();
+		
+		ComputeOffsets();
 		//BuildeImageSpace();
 
 		bool b0 = false;
 
 		std::vector<Vector2d> offset;
-		GenerateOffset(false, toolpath.size() - 1, toolpath_size / 2, offset);
+		GenerateOffset(false, offsets.size() - 1, toolpath_size / 2, offset);
 		if (offset.size() == 0)
 			b0=true;
 		std::vector<Vector2d>().swap(offset);
 
-		for (int i = 0; i < toolpath.size(); i++)
+		for (int i = 0; i < offsets.size(); i++)
 		{
 		    //double entry_d_1 = DeltaDEuclideanDistance(entry_d_0, toolpath_size, i);
 			//double exit_d_1 = DeltaDEuclideanDistance(exit_d_0, toolpath_size, i);
-
 
 			bool goon = true;
 
@@ -104,7 +103,7 @@ namespace hpcg {
 			GetOnePointFromOffset(i, exit_d_1, exit_p_1);
 
 
-			if (i < toolpath.size() - 1)
+			if (i < offsets.size() - 1)
 			{
 				double entry_d_1_0 = FindNearestPoint(i + 1, entry_p_1);
 				double exit_d_1_0 = FindNearestPoint(i + 1, exit_p_1);
@@ -135,7 +134,7 @@ namespace hpcg {
 
 
 			bool b1;
-			if (i == toolpath.size() - 1)
+			if (i == offsets.size() - 1)
 			{
 				double d0, d1;
 				if (entry_d_0 > exit_d_1)
@@ -168,11 +167,11 @@ namespace hpcg {
 
 			bool b2= true;
 
-			if (i == toolpath.size()-1)
+			if (i == offsets.size()-1)
 			{
 				Vector2d v((entry_p_1[0] + exit_p_1[0]) / 2.0, (entry_p_1[1] + exit_p_1[1]) / 2.0);
 
-				double t = MinimalDistance(toolpath[i], v);
+				double t = MinimalDistance(offsets[i], v);
 				double t0 = FindNearestPoint(i, v);
 
 				if (t < 0.000001)
@@ -191,7 +190,7 @@ namespace hpcg {
 				dddd.push_back(exit_p_0);
 				cccc.push_back(exit_p_1);
 
-				if (i == toolpath.size() - 1)
+				if (i == offsets.size() - 1)
 				{
 					if (b0)
 					{
@@ -239,7 +238,7 @@ namespace hpcg {
 					SelectOnePartOffset(i, exit_d_0, entry_d_1, exit_spiral);
 				}
 
-				if (i + 1 < toolpath.size())
+				if (i + 1 < offsets.size())
 				{
 					entry_d_0 = FindNearestPoint(i + 1, exit_spiral[exit_spiral.size() - 1]);
 					exit_d_0 = FindNearestPoint(i + 1, entry_spiral[entry_spiral.size() - 1]);
@@ -252,7 +251,7 @@ namespace hpcg {
 				cccc.push_back(exit_p_0);
 				dddd.push_back(exit_p_1);
 
-				if (i == toolpath.size() - 1)
+				if (i == offsets.size() - 1)
 				{
 					if (b0)
 					{
@@ -299,7 +298,7 @@ namespace hpcg {
 					SelectOnePartOffset(i, exit_d_0, entry_d_1, entry_spiral);
 				}
 
-				if (i + 1 < toolpath.size())
+				if (i + 1 < offsets.size())
 				{
 					entry_d_0 = FindNearestPoint(i + 1, entry_spiral[entry_spiral.size() - 1]);
 					exit_d_0 = FindNearestPoint(i + 1, exit_spiral[exit_spiral.size() - 1]);
@@ -310,23 +309,6 @@ namespace hpcg {
 				break;
 		}
 
-
-		for (int i = 0; i < image_space.pixels.size(); i++)
-		{
-			for (int j = 0; j < image_space.pixels[i].size(); j++)
-			{
-				if (image_space.pixels[i][j].inside)
-				{
-					double d0 = MinimalDistance(entry_spiral, image_space.pixels[i][j].center);
-					double d1 = MinimalDistance(exit_spiral, image_space.pixels[i][j].center);
-					if (d0 < toolpath_size / 2.0 || d1 < toolpath_size / 2.0)
-					{
-						image_space.pixels[i][j].filled = true;
-					}
-					
-				}
-			}
-		}
 
 		/*
 		int i = entry_spiral.size() - 1;
@@ -364,65 +346,7 @@ namespace hpcg {
 		*/
 	}
 
-	void ToolpathGenerator::OffsetBasedFermatSpiral()
-	{
-		for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
-		{
-			contour_aaa.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
-		}
 
-		entry_d_0 = DeltaDGeodesicDistance(entry_d_0, toolpath_size *0.6, contour_aaa);
-		exit_d_0 = DeltaDGeodesicDistance(exit_d_0, toolpath_size *0.6, contour_aaa);
-
-		int iter_nb = 0;
-
-		while (OneStep(contour_aaa, entry_d_0, exit_d_0, aaaa, bbbb))
-		{
-			iter_nb++;
-			std::cerr << "Iter: " << iter_nb << std::endl;
-
-			if (iter_nb == 10)
-			{
-				break;
-			}
-		}
-
-		OneStep1(contour_aaa, entry_d_0, exit_d_0, aaaa, bbbb);
-		return;
-
-		int i = aaaa.size() - 1;
-
-		do
-		{
-			if (MinimalDistance(bbbb, aaaa[i]) < toolpath_size - 0.00001)
-			{
-				aaaa.erase(aaaa.begin() + i);
-				i = aaaa.size() - 1;
-			}
-			else
-			{
-				break;
-			}
-
-		} while (true);
-
-
-		i = bbbb.size() - 1;
-
-		do
-		{
-			if (MinimalDistance(aaaa, bbbb[i]) < toolpath_size - 0.00001)
-			{
-				bbbb.erase(bbbb.begin() + i);
-				i = bbbb.size() - 1;
-			}
-			else
-			{
-				break;
-			}
-
-		} while (true);
-	}
 	double ToolpathGenerator::MinimalDistance(std::vector<Vector2d> &vecs, Vector2d &v)
 	{
 		double m_d = MAXDOUBLE;
@@ -437,394 +361,16 @@ namespace hpcg {
 		return m_d;
 
 	}
-	bool  ToolpathGenerator::TwoContourIntersection(std::vector<Vector2d> &contour0, std::vector<Vector2d> &contour1)
-	{
-		Polygon_2 poly_0,poly_1;
-		for (int i = 0; i < contour0.size(); i++)
-		{
-			poly_0.push_back(Point_2(contour0[i][0], contour0[i][1]));
-		}
-		for (int i = 0; i < contour1.size(); i++)
-		{
-			poly_1.push_back(Point_2(contour1[i][0], contour1[i][1]));
-		}
-
-		bool b = false;
-
-		for (int i = 0; i < contour0.size()&&!b; i++)
-		{
-			if (poly_1.bounded_side(Point_2(contour0[i][0], contour0[i][1])) == CGAL::ON_BOUNDED_SIDE)
-			{
-				b = true;
-				break;
-			}
-		}
-
-		for (int i = 0; i < contour1.size() && !b; i++)
-		{
-			if (poly_0.bounded_side(Point_2(contour1[i][0], contour1[i][1])) == CGAL::ON_BOUNDED_SIDE)
-			{
-				b = true;
-				break;
-			}
-		}
-
-		return b;
-
-	}
-	bool ToolpathGenerator::OneStep(std::vector<Vector2d> &outside_contour, double &start_d, double &end_d, std::vector<Vector2d> &entry_spiral_points, std::vector<Vector2d> &exit_spiral_points)
-	{
-		std::vector<Vector2d> offset;
-		GenerateOffset(false, outside_contour, toolpath_size, offset);
-
-		if (offset.size() == 0)
-		{
-			std::vector<Vector2d>().swap(offset);
-			GenerateOffset(false, outside_contour, toolpath_size / 2.0, offset);
-			if (offset.size() > 0)
-			{
-				Vector2d start_point, end_point;
-				GetOnePointFromOffset(outside_contour, start_d, start_point);
-				GetOnePointFromOffset(outside_contour, end_d, end_point);
-
-				double start_d_offset = FindNearestPoint(start_point, offset);
-				double end_d_offset = FindNearestPoint(end_point, offset);
-				double start_d_offset_0 = DeltaDEuclideanDistance(start_d_offset, -toolpath_size / 2.0, offset);
-				double start_d_offset_1 = DeltaDEuclideanDistance(start_d_offset, toolpath_size / 2.0, offset);
-
-
-				double end_d_offset_0 = DeltaDEuclideanDistance(end_d_offset, -toolpath_size / 2.0, offset);
-				double end_d_offset_1 = DeltaDEuclideanDistance(end_d_offset, toolpath_size / 2.0, offset);
-
-				Vector2d v;
-				GetOnePointFromOffset(offset, end_d_offset_0, v);
-				SelectOnePartOffset(offset, start_d_offset_0, end_d_offset_1, entry_spiral_points);
-				exit_spiral_points.push_back(v);
-			}
-			std::vector<Vector2d>().swap(offset);
-
-			return false;
-		}
-		else
-		{
-			Vector2d start_point, end_point;
-			GetOnePointFromOffset(outside_contour, start_d, start_point);
-			GetOnePointFromOffset(outside_contour, end_d, end_point);
-
-			double start_d_offset = FindNearestPoint(start_point, offset);
-			double end_d_offset = FindNearestPoint(end_point, offset);
-
-			std::vector<Vector2d> spiral0;
-			std::vector<Vector2d> contour;
-
-			SelectOnePartOffset(offset, end_d_offset, start_d_offset, contour);
-			SelectOnePartOffset(outside_contour, start_d, end_d, contour);
-
-			GenerateOffset(true, contour, toolpath_size / 2.0, spiral0);
-
-			double entry_start_d = FindNearestPoint(start_point, spiral0);
-			double entry_end_d = DeltaDGeodesicDistance(entry_start_d, toolpath_size*2.0, spiral0);
-			entry_end_d = DeltaDEuclideanDistance(entry_end_d, toolpath_size*1.0, spiral0);
-
-		
-
-			std::vector<Vector2d>().swap(contour);
-			std::vector<Vector2d> spiral1;
-			SelectOnePartOffset(offset, start_d_offset, end_d_offset, contour);
-			SelectOnePartOffset(outside_contour, end_d, start_d, contour);
-
-			GenerateOffset(true, contour, toolpath_size / 2.0, spiral1);
-
-			double exit_start_d = FindNearestPoint(end_point, spiral1);
-			double exit_end_d = DeltaDGeodesicDistance(exit_start_d, toolpath_size*2.0, spiral1);
-			exit_end_d = DeltaDEuclideanDistance(exit_end_d, toolpath_size*1.0, spiral1);
-
-			if (TwoContourIntersection(spiral0, spiral1))
-			{
-				SelectOnePartOffset(spiral0, entry_start_d, entry_end_d, entry_spiral_points);
-				SelectOnePartOffset(spiral1, exit_start_d, exit_end_d, exit_spiral_points);
-
-				std::vector<Vector2d>().swap(spiral0);
-				std::vector<Vector2d>().swap(spiral1);
-				std::vector<Vector2d>().swap(contour);
-				std::vector<Vector2d>().swap(offset);
-				std::vector<Vector2d> inside_contour;
-
-				for (int i = entry_spiral_points.size() - 1; i >= 0; i--)
-				{
-					double dddd = ComputeDistancePointContour(outside_contour, entry_spiral_points[i]);
-
-					if (ComputeDistancePointContour(outside_contour, entry_spiral_points[i]) > toolpath_size)
-					{
-						inside_contour.push_back(entry_spiral_points[i]);
-					}
-					else
-					{
-						break;
-					}
-				}
-
-				Vector2d v0 = inside_contour[inside_contour.size() - 1];
-
-				for (int i = exit_spiral_points.size() - 1; i >= 0; i--)
-				{
-					if (ComputeDistancePointContour(outside_contour, exit_spiral_points[i]) > toolpath_size)
-					{
-						inside_contour.push_back(exit_spiral_points[i]);
-					}
-					else
-					{
-						break;
-					}
-				}
-
-				Vector2d v1 = inside_contour[inside_contour.size() - 1];
-
-				double d0 = FindNearestPoint(v0, inside_contour);
-				double d1 = FindNearestPoint(v1, inside_contour);
-
-				start_d = DeltaDGeodesicDistance(d1, toolpath_size*1.5, inside_contour);
-				end_d = DeltaDGeodesicDistance(d0, toolpath_size*1.5, inside_contour);
-
-				GetOnePointFromOffset(inside_contour, start_d, start_point);
-				GetOnePointFromOffset(inside_contour, end_d, end_point);
-
-				std::vector<Vector2d>().swap(outside_contour);
-				GenerateOffset(false, inside_contour, toolpath_size / 2.0, outside_contour);
-				std::vector<Vector2d>().swap(inside_contour);
-				start_d = FindNearestPoint(start_point, outside_contour);
-				end_d = FindNearestPoint(end_point, outside_contour);
-				return true;
-			}
-			else
-			{
-				std::vector<Vector2d>().swap(offset);
-				GenerateOffset(false, outside_contour, toolpath_size / 2.0, offset);
-
-				Vector2d start_point, end_point;
-				GetOnePointFromOffset(outside_contour, start_d, start_point);
-				GetOnePointFromOffset(outside_contour, end_d, end_point);
-
-				double start_d_offset = FindNearestPoint(start_point, offset);
-				double end_d_offset = FindNearestPoint(end_point, offset);
-				double start_d_offset_0 = DeltaDEuclideanDistance(start_d_offset, -toolpath_size / 2.0, offset);
-				double start_d_offset_1 = DeltaDEuclideanDistance(start_d_offset, toolpath_size / 2.0, offset);
-
-
-				double end_d_offset_0 = DeltaDEuclideanDistance(end_d_offset, -toolpath_size / 2.0, offset);
-				double end_d_offset_1 = DeltaDEuclideanDistance(end_d_offset, toolpath_size / 2.0, offset);
-
-				Vector2d v;
-				GetOnePointFromOffset(offset, end_d_offset_0, v);
-				SelectOnePartOffset(offset, start_d_offset_0, end_d_offset_1, entry_spiral_points);
-
-				SelectOnePartOffset(offset, end_d_offset_0, start_d_offset_1, exit_spiral_points);
-
-				return false;
-			}
-
-			
-		}
-
-	}
-	bool ToolpathGenerator::OneStep1(std::vector<Vector2d> &outside_contour, double &start_d, double &end_d, std::vector<Vector2d> &entry_spiral_points, std::vector<Vector2d> &exit_spiral_points)
-	{
-		std::vector<Vector2d> offset;
-		GenerateOffset(false, outside_contour, toolpath_size, offset);
-
-		if (offset.size() == 0)
-		{
-			std::vector<Vector2d>().swap(offset);
-			GenerateOffset(false, outside_contour, toolpath_size / 2.0, offset);
-			if (offset.size() > 0)
-			{
-				Vector2d start_point, end_point;
-				GetOnePointFromOffset(outside_contour, start_d, start_point);
-				GetOnePointFromOffset(outside_contour, end_d, end_point);
-
-				double start_d_offset = FindNearestPoint(start_point, offset);
-				double end_d_offset = FindNearestPoint(end_point, offset);
-				double start_d_offset_0 = DeltaDEuclideanDistance(start_d_offset, -toolpath_size / 2.0, offset);
-				double start_d_offset_1 = DeltaDEuclideanDistance(start_d_offset, toolpath_size / 2.0, offset);
-
-
-				double end_d_offset_0 = DeltaDEuclideanDistance(end_d_offset, -toolpath_size / 2.0, offset);
-				double end_d_offset_1 = DeltaDEuclideanDistance(end_d_offset, toolpath_size / 2.0, offset);
-
-				Vector2d v;
-				GetOnePointFromOffset(offset, end_d_offset_0, v);
-				SelectOnePartOffset(offset, start_d_offset_0, end_d_offset_1, entry_spiral_points);
-				exit_spiral_points.push_back(v);
-			}
-			std::vector<Vector2d>().swap(offset);
-
-			return false;
-		}
-		else
-		{
-			Vector2d start_point, end_point;
-			GetOnePointFromOffset(outside_contour, start_d, start_point);
-			GetOnePointFromOffset(outside_contour, end_d, end_point);
-
-			double start_d_offset = FindNearestPoint(start_point, offset);
-			double end_d_offset = FindNearestPoint(end_point, offset);
-
-			std::vector<Vector2d> spiral0;
-			std::vector<Vector2d> abcd;
-			std::vector<Vector2d> contour;
-
-			SelectOnePartOffset(offset, end_d_offset, start_d_offset, contour);
-			SelectOnePartOffset(outside_contour, start_d, end_d, contour);
-
-			GenerateOffset(true, contour, toolpath_size / 2.0, spiral0);
-			GenerateOffset(true, contour, toolpath_size / 2.0, abcd);
-
-			for (int i = 0; i < contour.size(); i++)
-			{
-				cccc.push_back(contour[i]);
-			}
-
-			for (int i = 0; i < abcd.size(); i++)
-			{
-				dddd.push_back(abcd[i]);
-			}
-
-			double entry_start_d = FindNearestPoint(start_point, spiral0);
-			double entry_end_d = DeltaDGeodesicDistance(entry_start_d, toolpath_size*2.0, spiral0);
-			entry_end_d = DeltaDEuclideanDistance(entry_end_d, toolpath_size*1.0, spiral0);
-
-			std::vector<Vector2d>().swap(contour);
-			std::vector<Vector2d> spiral1;
-			SelectOnePartOffset(offset, start_d_offset, end_d_offset, contour);
-			SelectOnePartOffset(outside_contour, end_d, start_d, contour);
-
-			GenerateOffset(true, contour, toolpath_size / 2.0, spiral1);
-
 	
-			double exit_start_d = FindNearestPoint(end_point, spiral1);
-			double exit_end_d = DeltaDGeodesicDistance(exit_start_d, toolpath_size*2.0, spiral1);
-			exit_end_d = DeltaDEuclideanDistance(exit_end_d, toolpath_size*1.0, spiral1);
-
-			if (TwoContourIntersection(spiral0, spiral1))
-			{
-			
-
-
-				SelectOnePartOffset(spiral0, entry_start_d, entry_end_d, entry_spiral_points);
-				SelectOnePartOffset(spiral1, exit_start_d, exit_end_d, exit_spiral_points);
-				return true;
-				std::vector<Vector2d>().swap(spiral0);
-				std::vector<Vector2d>().swap(spiral1);
-				std::vector<Vector2d>().swap(contour);
-				std::vector<Vector2d>().swap(offset);
-				std::vector<Vector2d> inside_contour;
-
-				for (int i = entry_spiral_points.size() - 1; i >= 0; i--)
-				{
-					double dddd = ComputeDistancePointContour(outside_contour, entry_spiral_points[i]);
-
-					if (ComputeDistancePointContour(outside_contour, entry_spiral_points[i]) > toolpath_size)
-					{
-						inside_contour.push_back(entry_spiral_points[i]);
-					}
-					else
-					{
-						break;
-					}
-				}
-
-				Vector2d v0 = inside_contour[inside_contour.size() - 1];
-
-				for (int i = exit_spiral_points.size() - 1; i >= 0; i--)
-				{
-					if (ComputeDistancePointContour(outside_contour, exit_spiral_points[i]) > toolpath_size)
-					{
-						inside_contour.push_back(exit_spiral_points[i]);
-					}
-					else
-					{
-						break;
-					}
-				}
-
-				Vector2d v1 = inside_contour[inside_contour.size() - 1];
-
-				double d0 = FindNearestPoint(v0, inside_contour);
-				double d1 = FindNearestPoint(v1, inside_contour);
-
-				start_d = DeltaDGeodesicDistance(d1, toolpath_size*1.5, inside_contour);
-				end_d = DeltaDGeodesicDistance(d0, toolpath_size*1.5, inside_contour);
-
-				GetOnePointFromOffset(inside_contour, start_d, start_point);
-				GetOnePointFromOffset(inside_contour, end_d, end_point);
-
-				std::vector<Vector2d>().swap(outside_contour);
-				GenerateOffset(false, inside_contour, toolpath_size / 2.0, outside_contour);
-				std::vector<Vector2d>().swap(inside_contour);
-				start_d = FindNearestPoint(start_point, outside_contour);
-				end_d = FindNearestPoint(end_point, outside_contour);
-				return true;
-			}
-			else
-			{
-				std::vector<Vector2d>().swap(offset);
-				GenerateOffset(false, outside_contour, toolpath_size / 2.0, offset);
-
-				Vector2d start_point, end_point;
-				GetOnePointFromOffset(outside_contour, start_d, start_point);
-				GetOnePointFromOffset(outside_contour, end_d, end_point);
-
-				double start_d_offset = FindNearestPoint(start_point, offset);
-				double end_d_offset = FindNearestPoint(end_point, offset);
-				double start_d_offset_0 = DeltaDEuclideanDistance(start_d_offset, -toolpath_size / 2.0, offset);
-				double start_d_offset_1 = DeltaDEuclideanDistance(start_d_offset, toolpath_size / 2.0, offset);
-
-
-				double end_d_offset_0 = DeltaDEuclideanDistance(end_d_offset, -toolpath_size / 2.0, offset);
-				double end_d_offset_1 = DeltaDEuclideanDistance(end_d_offset, toolpath_size / 2.0, offset);
-
-				Vector2d v;
-				GetOnePointFromOffset(offset, end_d_offset_0, v);
-				SelectOnePartOffset(offset, start_d_offset_0, end_d_offset_1, entry_spiral_points);
-
-				SelectOnePartOffset(offset, end_d_offset_0, start_d_offset_1, exit_spiral_points);
-
-				return false;
-			}
-
-
-		}
-
-	}
-	double ToolpathGenerator::ComputeDistancePointContour(std::vector<Vector2d> &contour, Vector2d v)
-	{
-		double min_d = MAXDOUBLE;
-		int min_i = -1;
-		for (int i = 0; i < contour.size(); i++)
-		{
-			Point_2 p0(contour[i].x, contour[i].y);
-			Point_2 p1(contour[(i + 1) % contour.size()].x, contour[(i + 1) % contour.size()].y);
-
-			double l = sqrt((double)CGAL::squared_distance(Point_2(v[0], v[1]), Segment_2(p0, p1)));
-
-			if (l < min_d)
-			{
-				min_d = l;
-				min_i = i;
-			}
-		}
-
-		return min_d;
-	}
 	void ToolpathGenerator::GenerateOffset(bool direction, int offset_index, double lOffset, std::vector<Vector2d> &offset)
 	{
 		std::vector<Vector2d> contour;
 
-		if (offset_index >= 0 && offset_index <= toolpath.size() - 1)
+		if (offset_index >= 0 && offset_index <= offsets.size() - 1)
 		{
-			for (int i = 0; i < toolpath[offset_index].size(); i++)
+			for (int i = 0; i < offsets[offset_index].size(); i++)
 			{
-				contour.push_back(toolpath[offset_index][i]);
+				contour.push_back(offsets[offset_index][i]);
 			}
 		}
 		else
@@ -955,11 +501,11 @@ namespace hpcg {
 	{
 		std::vector<Vector2d> contour;
 
-		if (offset_index >= 0 && offset_index <= toolpath.size() - 1)
+		if (offset_index >= 0 && offset_index <= offsets.size() - 1)
 		{
-			for (int i = 0; i < toolpath[offset_index].size(); i++)
+			for (int i = 0; i < offsets[offset_index].size(); i++)
 			{
-				contour.push_back(toolpath[offset_index][i]);
+				contour.push_back(offsets[offset_index][i]);
 			}
 		}
 		else
@@ -1094,11 +640,11 @@ namespace hpcg {
 	{
 		std::vector<Vector2d> contour;
 
-		if (offset_index >= 0 && offset_index <= toolpath.size() - 1)
+		if (offset_index >= 0 && offset_index <= offsets.size() - 1)
 		{
-			for (int i = 0; i < toolpath[offset_index].size(); i++)
+			for (int i = 0; i < offsets[offset_index].size(); i++)
 			{
-				contour.push_back(toolpath[offset_index][i]);
+				contour.push_back(offsets[offset_index][i]);
 			}
 		}
 		else
@@ -1156,7 +702,7 @@ namespace hpcg {
 
 	double ToolpathGenerator::ComputeNextTurningPoint(double d, double distance, int offset_index)
 	{
-		if (offset_index == toolpath.size() - 1)
+		if (offset_index == offsets.size() - 1)
 		{
 			return DeltaDEuclideanDistance(d,distance,offset_index);
 		}
@@ -1198,10 +744,10 @@ namespace hpcg {
 
 				std::vector<Vector2d> vecs;
 
-				for (int i = 0; i < toolpath[offset_index].size(); i++)
+				for (int i = 0; i < offsets[offset_index].size(); i++)
 				{
-					Point_2 p0(toolpath[offset_index][i][0], toolpath[offset_index][i][1]);
-					Point_2 p1(toolpath[offset_index][(i + 1) % toolpath[offset_index].size()][0], toolpath[offset_index][(i + 1) % toolpath[offset_index].size()][1]);
+					Point_2 p0(offsets[offset_index][i][0], offsets[offset_index][i][1]);
+					Point_2 p1(offsets[offset_index][(i + 1) % offsets[offset_index].size()][0], offsets[offset_index][(i + 1) % offsets[offset_index].size()][1]);
 
 					CGAL::Object result = CGAL::intersection(Segment_2(p0, p1), l2);
 
@@ -1269,11 +815,11 @@ namespace hpcg {
 
 		std::vector<Vector2d> contour;
 
-		if (offset_index >= 0 && offset_index <= toolpath.size() - 1)
+		if (offset_index >= 0 && offset_index <= offsets.size() - 1)
 		{
-			for (int i = 0; i < toolpath[offset_index].size(); i++)
+			for (int i = 0; i < offsets[offset_index].size(); i++)
 			{
-				contour.push_back(toolpath[offset_index][i]);
+				contour.push_back(offsets[offset_index][i]);
 			}
 		}
 		else
@@ -1386,17 +932,7 @@ namespace hpcg {
 		return -1.0;
 	}
 
-	double ToolpathGenerator::OneOffsetLength(int offset_index)
-	{
-		double length = 0.0;
-		for (int i = 0; i < toolpath[offset_index].size(); i++)
-		{
-			length += sqrt((double)CGAL::squared_distance(Point_2(toolpath[offset_index][i].x, toolpath[offset_index][i].y), Point_2(toolpath[offset_index][(i + 1) % toolpath[offset_index].size()].x, toolpath[offset_index][(i + 1) % toolpath[offset_index].size()].y)));
-		}
 
-		return length;
-
-	}
 
 	void ToolpathGenerator::GetOnePointFromOffset(std::vector<Vector2d> &contour, double d, Vector2d &v)
 	{
@@ -1430,11 +966,11 @@ namespace hpcg {
 
 		std::vector<Vector2d> contour;
 
-		if (offset_index >= 0 && offset_index <= toolpath.size() - 1)
+		if (offset_index >= 0 && offset_index <= offsets.size() - 1)
 		{
-			for (int i = 0; i < toolpath[offset_index].size(); i++)
+			for (int i = 0; i < offsets[offset_index].size(); i++)
 			{
-				contour.push_back(toolpath[offset_index][i]);
+				contour.push_back(offsets[offset_index][i]);
 			}
 		}
 		else

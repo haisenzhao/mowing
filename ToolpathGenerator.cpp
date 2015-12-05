@@ -15,56 +15,34 @@ namespace hpcg {
 
 	ToolpathGenerator::ToolpathGenerator(){
 
-
 	}
-
-	std::vector<PixelIndex> insertpixels;
-
 
 	int iiiiii = 0;
 	void  ToolpathGenerator::StepDebug()
 	{
-		//SearchOnePath(false);
-		//SearchOneStepforSpiralExit(false);
-
 		iiiiii++;
-		//draw_offset = !draw_offset;
-
-
-	//	PolygonSmoothing();
 	}
-
 
 
 	void ToolpathGenerator::Init(TMeshProcessor* render)
 	{
-
 		image_space.pixel_size = 0.05;
 		image_space.toolpath_size = 0.2;
 		toolpath_size = 0.2;
-
-		spiral_affect_index = 0;
-
-		spiral_entry_affect_index = 0;
-		spiral_exit_affect_index = 0;
 
 		draw_boundary = true;
 		draw_pixels = true;
 		draw_aixs =false;
 		draw_contour = true;
-		draw_offset = true;
+		draw_offset = false;
 		draw_spiral = false;
 
 		linewidth = 5;
 
-		spiral_direction = false;
-
-		first_two_step_bool = false;
 
 		entry_d_0 = 0.8;
 		exit_d_0 = 0.2;
 
-		//parameter
 		std::string path = "D:\\test.txt";
 		std::ifstream file(path, std::ios::in);
 
@@ -78,23 +56,18 @@ namespace hpcg {
 		file >> entry_d_0 >> exit_d_0;
 		file.clear();
 		file.close();
-		//parameter
 		
 		image_space.toolpath_size = toolpath_size;
 
 		m_render = render;
 		LoadContour();
 		
-		//FermatSpiral();
-		//GenerateToolpathBasedonImageSpace();
-		//OffsetBasedFermatSpiral();
-
 		OffsetBasedFermatSpiral1();
 
 		//ArchinedeanSpiral();
 
 		//Zigzag();
-
+		
 		/*
 		iss = CGAL::create_interior_straight_skeleton_2(contours);
 
@@ -104,7 +77,6 @@ namespace hpcg {
 			<< " faces" << std::endl;
 
 		*/
-
 	}
 	
 	void ToolpathGenerator::LoadContour()
@@ -112,13 +84,13 @@ namespace hpcg {
 		//load
 		std::string path = "D:\\task2\\SLAM\\3DprintingFramework\\GenerateTestData\\test.txt";
 		std::ifstream file(path, std::ios::in);
-
+		
 		if (!file)
 		{
 			std::cout << "" << std::endl;
 			return;
 		}
-
+		
 		int contour_number;
 		file >> contour_number;
 
@@ -215,23 +187,12 @@ namespace hpcg {
 					{
 						if (image_space.pixels[i][j].filled)
 						{
-							if (image_space.pixels[i][j].filled_entry_exit)
-							{
-								glColor3f(0.8, 0.8, 0.8);
-								glBegin(GL_POLYGON);
-								DrawPixel(i, j);
-								glEnd();
-							}
-							else
-							{
-								glColor3f(0.8, 0.8, 0.8);
-								glBegin(GL_POLYGON);
-								DrawPixel(i, j);
-								glEnd();
-							}
+							glColor3f(0.8, 0.8, 0.8);
+							glBegin(GL_POLYGON);
+							DrawPixel(i, j);
+							glEnd();
 						}
 					}
-					
 				}
 			}
 		}
@@ -266,103 +227,15 @@ namespace hpcg {
 			glLineWidth(2);
 			glColor3f(0.5, 0.5, 0.0);
 
-			for (int i = 0; i < toolpath.size(); i++)
+			for (int i = 0; i < offsets.size(); i++)
 			{
 				glBegin(GL_LINE_LOOP);
-				for (int j = 0; j < toolpath[i].size(); j++)
+				for (int j = 0; j < offsets[i].size(); j++)
 				{
-					glVertex3f(toolpath[i][j][0], toolpath[i][j][1], 0.0);
+					glVertex3f(offsets[i][j][0], offsets[i][j][1], 0.0);
 				}
 				glEnd();
 			}
-		}
-
-		//draw boundary
-		if (draw_boundary)
-		{
-			glLineWidth(3);
-			glColor3f(0.0, 0.0, 0.0);
-
-			for (int i = 0; i < image_space.pixels.size(); i++)
-			{
-				for (int j = 0; j < image_space.pixels[i].size(); j++)
-				{
-					if (image_space.pixels[i][j].boundary)
-					{
-						glBegin(GL_POLYGON);
-						DrawPixel(i, j);
-						glEnd();
-					}
-				}
-			}
-		}
-
-		//draw spiral toolpath
-		if (draw_spiral)
-		{
-			glLineWidth(1);
-			
-			for (int i = 0; i < spirals.size(); i++)
-			{
-				glColor3f(1.0, 0.0, 0.0);
-				glBegin(GL_LINE_STRIP);
-				for (int j = 0; j < spirals[i].size(); j++)
-				{
-					//DrawPixel(spirals[i][j].x, spirals[i][j].y);
-					glVertex3f(image_space.pixels[spirals[i][j].x][spirals[i][j].y].center[0], image_space.pixels[spirals[i][j].x][spirals[i][j].y].center[1], 0.0);
-				}
-
-				glEnd();
-			}
-
-			for (int i = 0; i < spiral.size(); i++)
-			{
-				glColor3f(1.0, 0.0, 0.0);
-				glBegin(GL_POLYGON);
-				DrawPixel(spiral[i].x, spiral[i].y);
-				glEnd();
-			}
-
-
-			if (spiral.size() > 1)
-			{
-				glLineWidth(1);
-
-				if (image_space.pixels[spiral[spiral.size() - 1].x][spiral[spiral.size() - 1].y].related_boundary_index >= 0)
-				{
-					glColor3f(0.0, 1.0, 0.0);
-					glBegin(GL_POLYGON);
-					int related_boundary_index = image_space.pixels[spiral[spiral.size() - 1].x][spiral[spiral.size() - 1].y].related_boundary_index;
-					DrawPixel(spiral[related_boundary_index].x, spiral[related_boundary_index].y);
-					glEnd();
-				}
-
-				if (image_space.pixels[spiral[spiral.size() - 1].x][spiral[spiral.size() - 1].y].related_boundary_x >= 0 &&
-					image_space.pixels[spiral[spiral.size() - 1].x][spiral[spiral.size() - 1].y].related_boundary_y >= 0)
-				{
-					glColor3f(0.0, 1.0, 0.0);
-					glBegin(GL_POLYGON);
-					DrawPixel(image_space.pixels[spiral[spiral.size() - 1].x][spiral[spiral.size() - 1].y].related_boundary_x, image_space.pixels[spiral[spiral.size() - 1].x][spiral[spiral.size() - 1].y].related_boundary_y);
-					glEnd();
-				}
-
-				if (spiral_affect_index < spiral.size())
-				{
-					glColor3f(0.0, 1.0, 1.0);
-					glBegin(GL_POLYGON);
-					DrawPixel(spiral[spiral_affect_index].x, spiral[spiral_affect_index].y);
-					glEnd();
-				}
-			}
-		}
-
-		if (false)
-		{
-			glLineWidth(1);
-			glColor3f(0.0, 1.0, 0.0);
-			glBegin(GL_POLYGON);
-			DrawPixel(247, 30);
-			glEnd();
 		}
 
 		//draw axis
@@ -381,82 +254,6 @@ namespace hpcg {
 			glVertex3f(0.0, 1000.0, 0.0);
 			glEnd();
 		}
-
-		
-		glLineWidth(1);
-		glColor3f(1.0, 0.0, 0.0);
-		glBegin(GL_POLYGON);
-		DrawPixel(entry_point_x, entry_point_y);
-		glEnd();
-		glBegin(GL_POLYGON);
-		DrawPixel(exit_point_x, exit_point_y);
-		glEnd();
-	
-
-		if (true)
-		{
-			glLineWidth(1);
-			for (int i = 0; i < spiral_entry.size(); i++)
-			{
-				glColor3f(1.0, 0.0, 0.0);
-				glBegin(GL_POLYGON);
-				DrawPixel(spiral_entry[i].x, spiral_entry[i].y);
-				glEnd();
-			}
-
-			for (int i = 0; i < spiral_exit.size(); i++)
-			{
-				glColor3f(0.0, 1.0, 0.0);
-				glBegin(GL_POLYGON);
-				DrawPixel(spiral_exit[i].x, spiral_exit[i].y);
-				glEnd();
-			}
-
-			//spiral_entry_affect_index
-
-			if (spiral_exit.size() > 0 && spiral_exit_affect_index>0)
-			{
-				glColor3f(0.7, 0.2, 0.4);
-				glBegin(GL_POLYGON);
-				DrawPixel(spiral_exit[spiral_exit_affect_index - 1].x, spiral_exit[spiral_exit_affect_index - 1].y);
-				glEnd();
-			}
-
-		
-			if (spiral_entry.size() > 0 && spiral_entry_affect_index>0)
-			{
-				glBegin(GL_POLYGON);
-				DrawPixel(spiral_entry[spiral_entry_affect_index - 1].x, spiral_entry[spiral_entry_affect_index - 1].y);
-				glEnd();
-			}
-
-
-			if (spiral_entry.size() > 201)
-			{
-				glBegin(GL_POLYGON);
-				DrawPixel(spiral_entry[200].x, spiral_entry[200].y);
-				glEnd();
-			}
-
-			if (spiral_exit.size() > 406)
-			{
-				glBegin(GL_POLYGON);
-				DrawPixel(spiral_exit[406].x, spiral_exit[406].y);
-				glEnd();
-			}
-
-		}
-	
-
-		if (false)
-		{
-			glPointSize(20);
-			glColor3f(1.0, 0.0, 0.0);
-			glBegin(GL_POINTS);
-			glVertex3f(toolpath[0][0].x, toolpath[0][0].y, 0.0);
-			glEnd();
-		}
-
 
 		if (!draw_offset)
 		{
@@ -493,54 +290,7 @@ namespace hpcg {
 			}
 		}
 
-		if (true)
-		{
-			glLineWidth(2);
-			glColor3f(1.0, 0.0, 0.0);
-			glBegin(GL_LINE_STRIP);
-			for (int i = 0; i < aaaa.size(); i++)
-			{
-				glVertex3f(aaaa[i][0], aaaa[i][1], 0.0);
-			}
-			glEnd();
 
-			glLineWidth(2);
-			glColor3f(0.0, 1.0, 0.0);
-			glBegin(GL_LINE_STRIP);
-			for (int i = 0; i < bbbb.size(); i++)
-			{
-				glVertex3f(bbbb[i][0], bbbb[i][1], 0.0);
-			}
-			glEnd();
-
-			glLineWidth(2);
-			glColor3f(0.0, 0.0, 1.0);
-			glBegin(GL_LINE_STRIP);
-
-			if (aaaa.size() > 0 && bbbb.size())
-			{
-				glVertex3f(aaaa[aaaa.size() - 1][0], aaaa[aaaa.size() - 1][1], 0.0);
-				glVertex3f(bbbb[bbbb.size() - 1][0], bbbb[bbbb.size() - 1][1], 0.0);
-			}
-		
-			glEnd();
-		}
-
-
-		if (aaaa.size() > 0 && bbbb.size())
-		{
-			glPointSize(6);
-			glColor3f(1.0, 0.0, 0.0);
-			glBegin(GL_POINTS);
-			glVertex3f(aaaa[0][0], aaaa[0][1], 0.0);
-			glEnd();
-
-			glPointSize(6);
-			glColor3f(0.0, 1.0, 0.0);
-			glBegin(GL_POINTS);
-			glVertex3f(bbbb[0][0], bbbb[0][1], 0.0);
-			glEnd();
-		}
 
 		if (false)
 		if (entry_spiral.size() > 0 && exit_spiral.size())
@@ -581,7 +331,6 @@ namespace hpcg {
 			glEnd();
 		}
 
-
 		/*
 		Halfedge_const_handle null_halfedge;
 		Vertex_const_handle   null_vertex;
@@ -615,7 +364,7 @@ namespace hpcg {
 		*/
 	}
 
-	void ToolpathGenerator::GenerateToolpath()
+	void ToolpathGenerator::ComputeOffsets()
 	{
 		double lOffset = toolpath_size/2.0;
 		PolygonPtrVector offset_polygons = CGAL::create_interior_skeleton_and_offset_polygons_2(lOffset, contours);
@@ -629,7 +378,7 @@ namespace hpcg {
 					one_path.push_back(Vector2d((*vi).x(), (*vi).y()));
 				}
 
-				toolpath.push_back(one_path);
+				offsets.push_back(one_path);
 			}
 
 			lOffset = lOffset + toolpath_size;
@@ -637,11 +386,6 @@ namespace hpcg {
 		}
 	}
 
-
-	void ToolpathGenerator::GenerateToolpathBasedonOffset()
-	{
-		std::cout << "GenerateToolpathBasedonOffset" << std::endl;
-	}
 
 
 }

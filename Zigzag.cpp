@@ -5,6 +5,12 @@
 
 namespace hpcg {
 	
+
+	void ToolpathGenerator::OutputPath()
+	{
+
+	}
+
 	void ToolpathGenerator::Zigzag()
 	{
 		for (int i = 0; i < 4;i++)
@@ -69,3 +75,4 @@ namespace hpcg {
 
 	}
 }
+
