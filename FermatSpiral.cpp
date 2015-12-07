@@ -5,1351 +5,1011 @@
 
 namespace hpcg {
 
-	void ToolpathGenerator::FermatSpiral()
+
+	void ToolpathGenerator::ComputeOffsets()
 	{
-		GenerateToolpath();
-		BuildeImageSpace();
-		ChooseEntryExitPoints();
+		double lOffset = toolpath_size / 2.0;
+		PolygonPtrVector offset_polygons = CGAL::create_interior_skeleton_and_offset_polygons_2(lOffset, contours);
+		while (offset_polygons.size()>0)
+		{
+			for (PolygonPtrVector::const_iterator pi = offset_polygons.begin(); pi != offset_polygons.end(); ++pi)
+			{
+				std::vector<Vector2d> one_path;
+				for (Polygon_2::Vertex_const_iterator vi = (**pi).vertices_begin(); vi != (**pi).vertices_end(); ++vi)
+				{
+					one_path.push_back(Vector2d((*vi).x(), (*vi).y()));
+				}
+
+				offsets.push_back(one_path);
+			}
+
+			lOffset = lOffset + toolpath_size;
+			offset_polygons = CGAL::create_interior_skeleton_and_offset_polygons_2(lOffset, contours);
+		}
 	}
 
-	int entry_number = 0;
-	int exit_number = 0;
 
-	void ToolpathGenerator::GetOnePointFromOffset(double d, int &index_x, int &index_y)
+	bool CompareTwoDouble(double d0, double d1, double d)
 	{
-		assert(d>=0.0&&d<=1.0);
-
-		double length = 0.0;
-		for (int i = 0; i < toolpath[0].size(); i++)
+		if (d0 < d1)
 		{
-			length += sqrt((double)CGAL::squared_distance(Point_2(toolpath[0][i].x, toolpath[0][i].y), Point_2(toolpath[0][(i + 1) % toolpath[0].size()].x, toolpath[0][(i + 1) % toolpath[0].size()].y)));
+			if (d >= d0 && d <= d1)
+				return true;
+			else
+				return false;
+		}
+		else
+		{
+			if (d >= d1 && d <= d0)
+				return false;
+			else
+				return true;
+		}
+	}
+
+	void ToolpathGenerator::GenerateFermatSpiral()
+	{
+		
+		ComputeOffsets();
+		//BuildeImageSpace();
+
+		bool b0 = false;
+
+		std::vector<Vector2d> offset;
+		GenerateOffset(false, offsets.size() - 1, toolpath_size / 2, offset);
+		if (offset.size() == 0)
+			b0=true;
+		std::vector<Vector2d>().swap(offset);
+
+		for (int i = 0; i < offsets.size(); i++)
+		{
+		    //double entry_d_1 = DeltaDEuclideanDistance(entry_d_0, toolpath_size, i);
+			//double exit_d_1 = DeltaDEuclideanDistance(exit_d_0, toolpath_size, i);
+
+			bool goon = true;
+
+			double entry_d_1 = ComputeNextTurningPoint(entry_d_0, toolpath_size, i);
+			double exit_d_1 = ComputeNextTurningPoint(exit_d_0, toolpath_size, i);
+
+			bool move_entry_d_1 = true;
+			bool move_exit_d_1 = true;
+
+			if (!CompareTwoDouble(entry_d_0, exit_d_0, entry_d_1))
+			{
+				double d = DeltaDEuclideanDistance(entry_d_0, toolpath_size, i);
+
+				if (!CompareTwoDouble(entry_d_0, exit_d_0, d))
+				{
+					entry_d_1 = exit_d_0;
+				}
+				else
+				{
+					entry_d_1 = d;
+				}
+
+				entry_d_1 = exit_d_0;
+				move_entry_d_1 = false;
+				//goon = false;
+			}
+
+			if (!CompareTwoDouble(exit_d_0, entry_d_0, exit_d_1))
+			{
+				double d = DeltaDEuclideanDistance(exit_d_0, toolpath_size, i);
+				if (!CompareTwoDouble(exit_d_0, entry_d_0, d))
+				{
+
+					exit_d_1 = entry_d_0;
+				}
+				else
+				{
+					exit_d_1 = d;
+				}
+
+				exit_d_1 = entry_d_0;
+				//goon = false;
+
+				move_exit_d_1 = false;
+			}
+
+			Vector2d entry_p_0 = GetOnePointFromOffset(entry_d_0, i);
+			Vector2d entry_p_1 = GetOnePointFromOffset(entry_d_1, i);
+			Vector2d exit_p_0 = GetOnePointFromOffset(exit_d_0, i);
+			Vector2d exit_p_1 = GetOnePointFromOffset(exit_d_1, i);
+
+
+			if (i < offsets.size() - 1)
+			{
+				double entry_d_1_0 = FindNearestPointPar(entry_p_1, i + 1);
+				double exit_d_1_0 = FindNearestPointPar(exit_p_1, i + 1);
+
+				if (abs(entry_d_1_0 - exit_d_1_0) < 0.000001)
+				{
+					double t = DeltaDEuclideanDistance(exit_d_1_0, toolpath_size, i + 1);
+
+					Vector2d v=GetOnePointFromOffset(t,i+1);
+					t = FindNearestPointPar(v, i);
+
+					if (!move_exit_d_1)
+					{
+						entry_d_1 = t;
+					}
+					else
+					{
+						if (!move_entry_d_1)
+						{
+							exit_d_1 = t;
+						}
+					}
+				}
+				exit_p_1=GetOnePointFromOffset(exit_d_1,i);
+				entry_p_1=GetOnePointFromOffset(entry_d_1,i);
+			}
+
+
+			bool b1;
+			if (i == offsets.size() - 1)
+			{
+				double d0, d1;
+				if (entry_d_0 > exit_d_1)
+				{
+					d0 = entry_d_0 - exit_d_1;
+				}
+				else
+				{
+					d0 = 1.0 - (exit_d_1 - entry_d_0);
+				}
+
+				if (exit_d_0 > entry_d_1)
+				{
+					d1 = exit_d_0 - entry_d_1;
+				}
+				else
+				{
+					d1 = 1.0 - (entry_d_1 - exit_d_0);
+				}
+
+				if (d1 > d0)
+				{
+					b1 = true;
+				}
+				else
+				{
+					b1 = false;
+				}
+			}
+
+			bool b2= true;
+
+			if (i == offsets.size()-1)
+			{
+				Vector2d v((entry_p_1[0] + exit_p_1[0]) / 2.0, (entry_p_1[1] + exit_p_1[1]) / 2.0);
+
+				double t = MinimalDistance(offsets[i], v);
+				double t0 = FindNearestPointPar(v,i);
+
+				if (t < 0.000001)
+				{
+					if (!CompareTwoDouble(entry_d_1, exit_d_1, t0))
+					{
+						b2 = false;
+					}
+				}
+			}
+
+			if (i % 2 == 0)
+			{
+				cccc.push_back(entry_p_0);
+				dddd.push_back(entry_p_1);
+				dddd.push_back(exit_p_0);
+				cccc.push_back(exit_p_1);
+
+				if (i == offsets.size() - 1)
+				{
+					if (b0)
+					{
+						entry_spiral.push_back(entry_p_0);
+						exit_spiral.push_back(exit_p_0);
+						break;
+						if (b1)
+						{
+							SelectOnePartOffset(i, exit_d_0, entry_d_1, exit_spiral);
+							entry_spiral.push_back(entry_p_0);
+						}
+						else
+						{
+							SelectOnePartOffset(i, entry_d_0, exit_d_1, entry_spiral);
+							exit_spiral.push_back(exit_p_0);
+						}
+					}
+					else
+					{
+						if (b2)
+						{
+							SelectOnePartOffset(i, entry_d_0, exit_d_1, entry_spiral);
+							SelectOnePartOffset(i, exit_d_0, entry_d_1, exit_spiral);
+						}
+						else
+						{
+							if (b1)
+							{
+								SelectOnePartOffset(i, exit_d_0, entry_d_1, exit_spiral);
+								entry_spiral.push_back(entry_p_0);
+							}
+							else
+							{
+								SelectOnePartOffset(i, entry_d_0, exit_d_1, entry_spiral);
+								exit_spiral.push_back(exit_p_0);
+							}
+						}
+					}
+
+				}
+				else
+				{
+
+					SelectOnePartOffset(i, entry_d_0, exit_d_1, entry_spiral);
+					SelectOnePartOffset(i, exit_d_0, entry_d_1, exit_spiral);
+				}
+
+				if (i + 1 < offsets.size())
+				{
+					entry_d_0 = FindNearestPointPar(exit_spiral[exit_spiral.size() - 1], i + 1);
+					exit_d_0 = FindNearestPointPar(entry_spiral[entry_spiral.size() - 1],i+1);
+				}
+			}
+			else
+			{
+				dddd.push_back(entry_p_0);
+				cccc.push_back(entry_p_1);
+				cccc.push_back(exit_p_0);
+				dddd.push_back(exit_p_1);
+
+				if (i == offsets.size() - 1)
+				{
+					if (b0)
+					{
+						exit_spiral.push_back(entry_p_0);
+						entry_spiral.push_back(exit_p_0);
+						break;
+						if (b1)
+						{
+							SelectOnePartOffset(i, exit_d_0, entry_d_1, entry_spiral);
+							exit_spiral.push_back(entry_p_0);
+						}
+						else
+						{
+							SelectOnePartOffset(i, entry_d_0, exit_d_1, exit_spiral);
+							entry_spiral.push_back(exit_p_0);
+						}
+					}
+					else
+					{
+						if (b2)
+						{
+							SelectOnePartOffset(i, entry_d_0, exit_d_1, exit_spiral);
+							SelectOnePartOffset(i, exit_d_0, entry_d_1, entry_spiral);
+						}
+						else
+						{
+							if (b1)
+							{
+								SelectOnePartOffset(i, exit_d_0, entry_d_1, entry_spiral);
+								exit_spiral.push_back(entry_p_0);
+							}
+							else
+							{
+								SelectOnePartOffset(i, entry_d_0, exit_d_1, exit_spiral);
+								entry_spiral.push_back(exit_p_0);
+							}
+						}
+					}
+
+				}
+				else
+				{
+					SelectOnePartOffset(i, entry_d_0, exit_d_1, exit_spiral);
+					SelectOnePartOffset(i, exit_d_0, entry_d_1, entry_spiral);
+				}
+
+				if (i + 1 < offsets.size())
+				{
+					entry_d_0 = FindNearestPointPar(entry_spiral[entry_spiral.size() - 1], i + 1);
+					exit_d_0 = FindNearestPointPar(exit_spiral[exit_spiral.size() - 1], i + 1);
+				}
+			}
+
+			if (!goon)
+				break;
+		}
+
+
+		/*
+		int i = entry_spiral.size() - 1;
+
+		do
+		{
+			if (MinimalDistance(exit_spiral, entry_spiral[i]) < toolpath_size - 0.00001)
+			{
+				entry_spiral.erase(entry_spiral.begin() + i);
+				i = entry_spiral.size() - 1;
+			}
+			else
+			{
+				break;
+			}
+
+		} while (true);
+
+
+		i = exit_spiral.size() - 1;
+
+		do
+		{
+			if (MinimalDistance(entry_spiral, exit_spiral[i]) < toolpath_size - 0.00001)
+			{
+				exit_spiral.erase(exit_spiral.begin() + i);
+				i = exit_spiral.size() - 1;
+			}
+			else
+			{
+				break;
+			}
+
+		} while (true);
+		*/
+	}
+
+	double ToolpathGenerator::MinimalDistanceSegments(std::vector<Vector2d> &segments, Vector2d &v)
+	{
+		double m_d = MAXDOUBLE;
+
+		for (int i = 0; i < segments.size(); i = i + 2)
+		{
+			double d = sqrt((double)CGAL::squared_distance(Point_2(v.x, v.y), Segment_2(Point_2(segments[i].x, segments[i].y), Point_2(segments[i + 1].x, segments[i + 1].y))));
+			m_d = min(m_d, d);
+		}
+
+		return m_d;
+	}
+
+	double ToolpathGenerator::MinimalDistance(std::vector<Vector2d> &vecs, Vector2d &v)
+	{
+		double m_d = MAXDOUBLE;
+
+		for (int i = 0; i < vecs.size()-1; i++)
+		{
+			double d = sqrt((double)CGAL::squared_distance(Point_2(v.x, v.y), Segment_2(Point_2(vecs[i].x, vecs[i].y), Point_2(vecs[i+1].x, vecs[i+1].y))));
+
+			m_d = min(m_d,d);
+		}
+
+		return m_d;
+
+	}
+	
+	void ToolpathGenerator::GenerateOffset(bool direction, int offset_index, double lOffset, std::vector<Vector2d> &offset)
+	{
+		std::vector<Vector2d> contour;
+
+		if (offset_index >= 0 && offset_index <= offsets.size() - 1)
+		{
+			for (int i = 0; i < offsets[offset_index].size(); i++)
+			{
+				contour.push_back(offsets[offset_index][i]);
+			}
+		}
+		else
+		{
+			if (offset_index < 0)
+			{
+				for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
+				{
+					contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
+				}
+			}
+			else
+			{
+				assert(false);
+			}
+		}
+
+		GenerateOffset(direction, contour, lOffset, offset);
+
+		std::vector<Vector2d>().swap(contour);
+	}
+	void ToolpathGenerator::GenerateOffset(bool direction, std::vector<Vector2d> &contour, double lOffset, std::vector<Vector2d> &offset)
+	{
+		Polygon_2 polygon;
+
+		for (int i = 0; i < contour.size(); i++)
+		{
+			polygon.push_back(Point_2(contour[i][0], contour[i][1]));
+		}
+
+		if (polygon.is_simple())
+		{
+			if (direction)
+				polygon.reverse_orientation();
+
+			PolygonPtrVector offset_polygons = CGAL::create_interior_skeleton_and_offset_polygons_2(lOffset, polygon);
+
+			for (PolygonPtrVector::const_iterator pi = offset_polygons.begin(); pi != offset_polygons.end(); ++pi)
+			{
+				for (Polygon_2::Vertex_const_iterator vi = (**pi).vertices_begin(); vi != (**pi).vertices_end(); ++vi)
+				{
+					offset.push_back(Vector2d((*vi).x(), (*vi).y()));
+				}
+			}
+		}
+		else
+		{
+			assert(false);
+		}
+
+	}
+	void ToolpathGenerator::SelectOnePartOffset(std::vector<Vector2d> &contour, double d0, double d1, std::vector<Vector2d> &vecs)
+	{
+		if (abs(d0 - d1) < 0.0000001)
+		{
+			Vector2d v=GetOnePointFromOffset(d0,contour);
+			vecs.push_back(v);
+		}
+		else
+		{
+			double total_length = 0.0;
+			for (int i = 0; i < contour.size(); i++)
+			{
+				total_length += sqrt((double)CGAL::squared_distance(Point_2(contour[i].x, contour[i].y), Point_2(contour[(i + 1) % contour.size()].x, contour[(i + 1) % contour.size()].y)));
+			}
+			std::vector<double> vec_ds;
+
+			vec_ds.push_back(0.0);
+			double length = 0.0;
+			for (int i = 0; i < contour.size(); i++)
+			{
+				length += sqrt((double)CGAL::squared_distance(Point_2(contour[i].x, contour[i].y), Point_2(contour[(i + 1) % contour.size()].x, contour[(i + 1) % contour.size()].y)));
+				vec_ds.push_back(length / total_length);
+			}
+
+			Vector2d v=GetOnePointFromOffset(d0,contour);
+			vecs.push_back(v);
+
+			if (d0 > d1)
+			{
+				for (int i = vec_ds.size() - 1; i >= 0; i--)
+				{
+					if (vec_ds[i]<d0&&vec_ds[i]>d1)
+					{
+						v = GetOnePointFromOffset(vec_ds[i],contour);
+						vecs.push_back(v);
+					}
+
+					if (vec_ds[i] < d1)
+					{
+						break;
+					}
+				}
+			}
+			else
+			{
+				for (int i = vec_ds.size() - 1; i >0; i--)
+				{
+					if (vec_ds[i] < d0)
+					{
+						v = GetOnePointFromOffset(vec_ds[i],contour);
+						vecs.push_back(v);
+					}
+				}
+
+
+				for (int i = vec_ds.size() - 1; i >0; i--)
+				{
+					if (vec_ds[i] > d1)
+					{
+						v = GetOnePointFromOffset(vec_ds[i],contour);
+						vecs.push_back(v);
+					}
+				}
+			}
+
+			v=GetOnePointFromOffset(d1,contour);
+			vecs.push_back(v);
+
+			std::vector<double>().swap(vec_ds);
+		}
+
+		
+	}
+	void ToolpathGenerator::SelectOnePartOffset(int offset_index, double d0, double d1, std::vector<Vector2d> &vecs)
+	{
+		std::vector<Vector2d> contour;
+
+		if (offset_index >= 0 && offset_index <= offsets.size() - 1)
+		{
+			for (int i = 0; i < offsets[offset_index].size(); i++)
+			{
+				contour.push_back(offsets[offset_index][i]);
+			}
+		}
+		else
+		{
+			if (offset_index < 0)
+			{
+				for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
+				{
+					contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
+				}
+			}
+			else
+			{
+				assert(false);
+			}
+		}
+
+		SelectOnePartOffset(contour,d0, d1,vecs);
+		std::vector<Vector2d>().swap(contour);
+	}
+	double ToolpathGenerator::FindNearestPointPar(Vector2d v, std::vector<Vector2d> &contour)
+	{
+		Vector2d n_p;
+
+		double total_length = 0.0;
+		for (int i = 0; i < contour.size(); i++)
+		{
+			total_length += sqrt((double)CGAL::squared_distance(Point_2(contour[i].x, contour[i].y), Point_2(contour[(i + 1) % contour.size()].x, contour[(i + 1) % contour.size()].y)));
+		}
+
+		double min_d = MAXDOUBLE;
+		int min_i = -1;
+		for (int i = 0; i < contour.size(); i++)
+		{
+			Point_2 p0(contour[i].x, contour[i].y);
+			Point_2 p1(contour[(i + 1) % contour.size()].x, contour[(i + 1) % contour.size()].y);
+
+			double l = sqrt((double)CGAL::squared_distance(Point_2(v[0], v[1]), Segment_2(p0, p1)));
+
+			if (l < min_d)
+			{
+				min_d = l;
+				min_i = i;
+			}
+		}
+
+
+		if (min_i >= 0)
+		{
+
+			double length = 0.0;
+			for (int i = 0; i < min_i; i++)
+			{
+				length += sqrt((double)CGAL::squared_distance(Point_2(contour[i].x, contour[i].y), Point_2(contour[(i + 1) % contour.size()].x, contour[(i + 1) % contour.size()].y)));
+			}
+
+			Point_2 p0(contour[min_i].x, contour[min_i].y);
+			Point_2 p1(contour[(min_i + 1) % contour.size()].x, contour[(min_i + 1) % contour.size()].y);
+
+			double l0 = sqrt((double)CGAL::squared_distance(Point_2(v[0], v[1]), p0));
+			double l1 = sqrt((double)CGAL::squared_distance(Point_2(v[0], v[1]), p1));
+
+			if (min_d<l0 &&min_d<l1)
+			{
+				double l = sqrt((double)CGAL::squared_distance(p0, p1));
+				if (l < 0.00001)
+				{
+					v[0] = p0[0];
+					v[1] = p0[1];
+				}
+				else
+				{
+					Vector2d vec(p1[0] - p0[0], p1[1] - p0[1]);
+					Vector2d r_vec(vec[1], -vec[0]);
+					if (vec[0] < 0.00001)
+					{
+						r_vec[0] = -vec[1];
+						r_vec[1] = vec[0];
+					}
+
+					if (vec[1] < 0.00001)
+					{
+						r_vec[0] = vec[1];
+						r_vec[1] = -vec[0];
+					}
+
+					CGAL::Object result = CGAL::intersection(Segment_2(p0, p1), Line_2(Point_2(v[0], v[1]), Point_2(v[0] + r_vec[0], v[1] + r_vec[1])));
+
+					if (const Point_2 *ipoint = CGAL::object_cast<Point_2>(&result))
+					{
+						n_p[0] = ipoint->x();
+						n_p[1] = ipoint->y();
+					}
+					else
+					{
+						assert(false);
+					}
+				}
+			}
+			else
+			{
+				if (l0 < l1)
+				{
+					n_p[0] = p0[0];
+					n_p[1] = p0[1];
+				}
+				else
+				{
+					n_p[0] = p1[0];
+					n_p[1] = p1[1];
+				}
+
+			}
+
+			length += sqrt((double)CGAL::squared_distance(Point_2(contour[min_i].x, contour[min_i].y), Point_2(n_p[0], n_p[1])));
+
+			return length / total_length;
+		}
+		else
+		{
+			assert(false);
+		}
+
+		return -1.0;
+
+
+
+	}
+	
+	double ToolpathGenerator::FindNearestPointPar(Vector2d v, int offset_index)
+	{
+		std::vector<Vector2d> contour;
+
+		if (offset_index >= 0 && offset_index <= offsets.size() - 1)
+		{
+			for (int i = 0; i < offsets[offset_index].size(); i++)
+			{
+				contour.push_back(offsets[offset_index][i]);
+			}
+		}
+		else
+		{
+			if (offset_index < 0)
+			{
+				for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
+				{
+					contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
+				}
+			}
+			else
+			{
+				assert(false);
+			}
+		}
+
+		double returnD = FindNearestPointPar(v, contour);
+		std::vector<Vector2d>().swap(contour);
+
+		return returnD;
+	}
+	
+	double ToolpathGenerator::DeltaDGeodesicDistance(double d, double distance, std::vector<Vector2d> &contour)
+	{
+		double total_length = 0.0;
+		for (int i = 0; i < contour.size(); i++)
+		{
+			total_length += sqrt((double)CGAL::squared_distance(Point_2(contour[i].x, contour[i].y), Point_2(contour[(i + 1) % contour.size()].x, contour[(i + 1) % contour.size()].y)));
+		}
+
+		if (distance > 0)
+		{
+			if (d + distance / total_length < 1.0)
+			{
+				return d + distance / total_length;
+			}
+			else
+			{
+				return d + distance / total_length - 1.0;
+			}
+		}
+		else
+		{
+			if (d + distance / total_length > 0.0)
+			{
+				return d + distance / total_length;
+			}
+			else
+			{
+				return d + distance / total_length + 1.0;
+			}
+		}
+	}
+
+	double ToolpathGenerator::ComputeNextTurningPoint(double d, double distance, int offset_index)
+	{
+		if (offset_index == offsets.size() - 1)
+		{
+			return DeltaDEuclideanDistance(d,distance,offset_index);
+		}
+		else
+		{
+	
+			double d0 = DeltaDEuclideanDistance(d, distance, offset_index);
+			Vector2d v0=GetOnePointFromOffset(d0,offset_index);
+			double d1 = FindNearestPointPar(v0, offset_index + 1);
+			Vector2d v1=GetOnePointFromOffset(d1, offset_index + 1);
+			Vector2d v2=GetOnePointFromOffset(d,offset_index);
+			double d2 = FindNearestPointPar(v2, offset_index + 1);
+			
+			if (abs(d2-d1)>0.0001)
+			{
+				return d0;
+			}
+			else
+			{
+
+				Vector2d vec(v2[0] - v1[0], v2[1] - v1[1]);
+				Vector2d r_vec(vec[1], -vec[0]);
+				if (vec[0] < 0.00001)
+				{
+					r_vec[0] = -vec[1];
+					r_vec[1] = vec[0];
+				}
+
+				if (vec[1] < 0.00001)
+				{
+					r_vec[0] = vec[1];
+					r_vec[1] = -vec[0];
+				}
+
+				Line_2 l2(Point_2(v1[0], v1[1]), Point_2(v1[0] + r_vec[0], v1[1] + r_vec[1]));
+
+				std::vector<Vector2d> vecs;
+
+				for (int i = 0; i < offsets[offset_index].size(); i++)
+				{
+					Point_2 p0(offsets[offset_index][i][0], offsets[offset_index][i][1]);
+					Point_2 p1(offsets[offset_index][(i + 1) % offsets[offset_index].size()][0], offsets[offset_index][(i + 1) % offsets[offset_index].size()][1]);
+
+					CGAL::Object result = CGAL::intersection(Segment_2(p0, p1), l2);
+
+					if (const Point_2 *ipoint = CGAL::object_cast<Point_2>(&result))
+					{
+						vecs.push_back(Vector2d(ipoint->x(), ipoint->y()));
+					}
+				}
+
+				for (int i = 0; i < vecs.size(); i++)
+				{
+					double delta_d = FindNearestPointPar(vecs[i], offset_index);
+
+					if (abs(delta_d - d) > 0.5)
+					{
+						if (delta_d > d)
+						{
+							d = d + 1.0;
+						}
+						else
+						{
+							delta_d = delta_d + 1.0;
+						}
+					}
+
+					if (delta_d > d)
+					{
+						std::vector<Vector2d>().swap(vecs);
+
+						double min_d = MAXDOUBLE;
+						double return_d = delta_d;
+						for (int j = 1; j < 30; j++)
+						{
+							double t = d + j*(delta_d - d) / 30.0;
+
+							if (t > 1.0)
+								t = t - 1.0;
+
+							Vector2d v=GetOnePointFromOffset(t,offset_index);
+
+							double length = sqrt((double)CGAL::squared_distance(Point_2(v2[0], v2[1]), Line_2(Point_2(v[0], v[1]), Point_2(v1[0], v1[1]))));
+							if (abs(length - distance) < min_d)
+							{
+								min_d = abs(length - distance);
+								return_d = t;
+							}
+						}
+
+						return return_d;
+					}
+				}
+
+				assert(false);
+				return -1;
+			}
+
+		}
+	}
+
+	double ToolpathGenerator::DeltaDEuclideanDistance(double d, double distance, int offset_index)
+	{
+		assert(d >= 0.0&&d <= 1.0);
+
+		std::vector<Vector2d> contour;
+
+		if (offset_index >= 0 && offset_index <= offsets.size() - 1)
+		{
+			for (int i = 0; i < offsets[offset_index].size(); i++)
+			{
+				contour.push_back(offsets[offset_index][i]);
+			}
+		}
+		else
+		{
+			if (offset_index < 0)
+			{
+				for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
+				{
+					contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
+				}
+			}
+			else
+			{
+				assert(false);
+			}
+		}
+
+		double returnd=DeltaDEuclideanDistance(d, distance, contour);
+		std::vector<Vector2d>().swap(contour);
+		return returnd;
+	}
+
+	double ToolpathGenerator::DeltaDEuclideanDistance(double d, double distance, std::vector<Vector2d> &contour)
+	{
+		Vector2d v=GetOnePointFromOffset(d,contour);
+
+		std::vector<Vector2d> vecs;
+
+
+		int divided_nb = 30;
+		for (int i = 0; i < divided_nb; i++)
+		{
+			Point_2 p0(v[0] + abs(distance)*sin(i * 2 * PI / (double)divided_nb), v[1] + abs(distance)*cos(i * 2 * PI / (double)divided_nb));
+			Point_2 p1(v[0] + abs(distance)*sin((i + 1) * 2 * PI / (double)divided_nb), v[1] + abs(distance)*cos((i + 1) * 2 * PI / (double)divided_nb));
+
+			for (int j = 0; j < contour.size(); j++)
+			{
+				Point_2 p2(contour[j].x, contour[j].y);
+				Point_2 p3(contour[(j + 1) % contour.size()].x, contour[(j + 1) % contour.size()].y);
+
+				CGAL::Object result = CGAL::intersection(Segment_2(p0, p1), Segment_2(p2, p3));
+
+				if (const Point_2 *ipoint = CGAL::object_cast<Point_2>(&result))
+				{
+					vecs.push_back(Vector2d(ipoint->x(), ipoint->y()));
+				}
+			}
+		}
+
+		if (distance > 0)
+		{
+			for (int i = 0; i < vecs.size(); i++)
+			{
+				double delta_d = FindNearestPointPar(vecs[i], contour);
+
+				if (abs(delta_d - d) > 0.5)
+				{
+					if (delta_d > d)
+					{
+						d = d + 1.0;
+					}
+					else
+					{
+						delta_d = delta_d + 1.0;
+					}
+				}
+
+				if (delta_d > d)
+				{
+					if (delta_d > 1.0)
+						delta_d = delta_d - 1.0;
+
+					std::vector<Vector2d>().swap(vecs);
+					return delta_d;
+				}
+			}
+		}
+		else
+		{
+			for (int i = 0; i < vecs.size(); i++)
+			{
+				double delta_d = FindNearestPointPar(vecs[i], contour);
+
+				if (abs(delta_d - d) > 0.5)
+				{
+					if (delta_d > d)
+					{
+						d = d + 1.0;
+					}
+					else
+					{
+						delta_d = delta_d + 1.0;
+					}
+				}
+
+				if (delta_d < d)
+				{
+					if (delta_d > 1.0)
+						delta_d = delta_d - 1.0;
+
+					std::vector<Vector2d>().swap(vecs);
+					return delta_d;
+				}
+			}
+		}
+
+		std::vector<Vector2d>().swap(vecs);
+		return -1.0;
+	}
+
+
+
+	Vector2d ToolpathGenerator::GetOnePointFromOffset(double d,std::vector<Vector2d> &contour)
+	{
+		Vector2d v;
+		double length = 0.0;
+		for (int i = 0; i < contour.size(); i++)
+		{
+			length += sqrt((double)CGAL::squared_distance(Point_2(contour[i].x, contour[i].y), Point_2(contour[(i + 1) % contour.size()].x, contour[(i + 1) % contour.size()].y)));
 		}
 
 		double total_length = length;
 		length = 0.0;
 
-		for (int i = 0; i < toolpath[0].size(); i++)
+		for (int i = 0; i < contour.size(); i++)
 		{
-			double l = sqrt((double)CGAL::squared_distance(Point_2(toolpath[0][i].x, toolpath[0][i].y), Point_2(toolpath[0][(i + 1) % toolpath[0].size()].x, toolpath[0][(i + 1) % toolpath[0].size()].y)));
+			double l = sqrt((double)CGAL::squared_distance(Point_2(contour[i].x, contour[i].y), Point_2(contour[(i + 1) % contour.size()].x, contour[(i + 1) % contour.size()].y)));
 
 			if (d*total_length >= length&&d*total_length <= length + l)
 			{
-				double ll = (d - length / total_length)*total_length/l;
-				double x = toolpath[0][i].x + (toolpath[0][(i + 1) % toolpath[0].size()].x - toolpath[0][i].x)*ll;
-				double y = toolpath[0][i].y + (toolpath[0][(i + 1) % toolpath[0].size()].y - toolpath[0][i].y)*ll;
-
-				image_space.FindClosestPoint(x, y, index_x, index_y);
+				double ll = (d - length / total_length)*total_length / l;
+				v[0] = contour[i].x + (contour[(i + 1) % contour.size()].x - contour[i].x)*ll;
+				v[1] = contour[i].y + (contour[(i + 1) % contour.size()].y - contour[i].y)*ll;
 				break;
 			}
 			length += l;
 		}
 
-		double min_d = abs(image_space.pixels[index_x][index_y].distance-toolpath_size/2.0);
-
-		int i_int = 0;
-		int j_int = 0;
-		for (int i = -2; i <= 2; i++)
-		{
-			for (int j = -2; j <= 2; j++)
-			{
-				if (!(i == 0 && j == 0) && image_space.check(index_x + i, index_y + j))
-				{
-					if (abs(image_space.pixels[index_x + i][index_y + j].distance - toolpath_size / 2.0) < min_d)
-					{
-						min_d = abs(image_space.pixels[index_x + i][index_y + j].distance - toolpath_size / 2.0);
-						i_int = i;
-						j_int = j;
-					}
-				}
-			}
-		}
-
-		index_x = index_x + i_int;
-		index_y = index_y + j_int;
-	}
-	
-	void ToolpathGenerator::ConnectTwoPixels(PixelIndex p1, PixelIndex p2, std::vector<PixelIndex> &insertpixels)
-	{
-		int x = p1.x;
-		int y = p1.y;
-
-		Line_2 line(Point_2(image_space.pixels[p2.x][p2.y].center[0], image_space.pixels[p2.x][p2.y].center[1]), Point_2(image_space.pixels[p1.x][p1.y].center[0], image_space.pixels[p1.x][p1.y].center[1]));
-
-		double max_d = image_space.PixelsDistance(p1.x, p1.y, p2.x, p2.y);
-
-		insertpixels.push_back(p1);
-		do
-		{
-			double min_d = MAXDOUBLE;
-			int index_x = -1;
-			int index_y = -1;
-			for (int i = -1; i <= 1; i++)
-			{
-				for (int j = -1; j <= 1; j++)
-				{
-					if (image_space.check(x + i, y + j) && !(i == 0 && j == 0) && !((x + i) == p1.x && (y + j) == p1.y))
-					{
-						if (image_space.PixelsDistance(x + i, y + j, p2.x, p2.y) <= max_d)
-						{
-							Pixel &p = image_space.pixels[x + i][y + j];
-
-							if (insertpixels.size() > 1)
-							{
-								if ((x + i) == insertpixels[insertpixels.size() - 2].x && (y + j) == insertpixels[insertpixels.size() - 2].y)
-								{
-									continue;
-								}
-							}
-							double d = sqrt(CGAL::squared_distance(Point_2(p.center[0], p.center[1]), line));
-							if (min_d > d)
-							{
-								min_d = d;
-								index_x = x + i;
-								index_y = y + j;
-							}
-						}
-					}
-				}
-			}
-
-			if (index_x >= 0 && index_y >= 0)
-			{
-				if (index_x == p2.x&&index_y == p2.y)
-				{
-					break;
-				}
-				insertpixels.push_back(PixelIndex(index_x, index_y));
-			}
-			x = index_x;
-			y = index_y;
-
-		} while (true);
-
-		insertpixels.erase(insertpixels.begin());
+		return v;
 	}
 
-	void ToolpathGenerator::InsertPixeltoSpiralEntry(PixelIndex pi)
+	Vector2d ToolpathGenerator::GetOnePointFromOffset(double d,int offset_index)
 	{
-		if (!first_two_step_bool&&spiral_entry.size()>0 && image_space.pixels[pi.x][pi.y].related_boundary_x >= 0 && image_space.pixels[pi.x][pi.y].related_boundary_y >= 0)
+		assert(d >= 0.0&&d <= 1.0);
+
+		std::vector<Vector2d> contour;
+
+		if (offset_index >= 0 && offset_index <= offsets.size() - 1)
 		{
-			if (image_space.pixels[spiral_entry[spiral_entry.size() - 1].x][spiral_entry[spiral_entry.size() - 1].y].related_boundary_x >= 0 && image_space.pixels[spiral_entry[spiral_entry.size() - 1].x][spiral_entry[spiral_entry.size() - 1].y].related_boundary_y >= 0)
+			for (int i = 0; i < offsets[offset_index].size(); i++)
 			{
-				int int1 = image_space.pixels[image_space.pixels[pi.x][pi.y].related_boundary_x][image_space.pixels[pi.x][pi.y].related_boundary_y].boundary_index;
-				int int2 = image_space.pixels[image_space.pixels[spiral_entry[spiral_entry.size() - 1].x][spiral_entry[spiral_entry.size() - 1].y].related_boundary_x][image_space.pixels[spiral_entry[spiral_entry.size() - 1].x][spiral_entry[spiral_entry.size() - 1].y].related_boundary_y].boundary_index;
-
-				if (int2 - int1 > 0)
-				{
-					spiral_direction = false;
-				}
-
-				if (int2 - int1 < 0)
-				{
-					spiral_direction = true;
-				}
+				contour.push_back(offsets[offset_index][i]);
 			}
 		}
-
-		image_space.pixels[pi.x][pi.y].centeraxis = true;
-		spiral_entry.push_back(pi);
-
-		for (int i = pi.x - 1.0*toolpath_size / image_space.pixel_size; i <= pi.x + 1.0*toolpath_size / image_space.pixel_size; i++)
+		else
 		{
-			for (int j = pi.y - 1.0*toolpath_size / image_space.pixel_size; j <= pi.y + 1.0*toolpath_size / image_space.pixel_size; j++)
+			if (offset_index < 0)
 			{
-				if (image_space.check(i, j) && !image_space.pixels[i][j].filled)
+				for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
 				{
-					if (image_space.PixelsDistance(i, j, pi.x, pi.y) <= toolpath_size / 2.0 + 0.00001)
-					{
-						image_space.pixels[i][j].filled = true;
-						image_space.pixels[i][j].filled_entry_exit = true;
-						image_space.pixels[i][j].filled_spiral_index = spiral_entry.size() - 1;
-					}
+					contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
 				}
-			}
-		}
-
-
-
-		int current_index = spiral_entry.size() - 1;
-
-		for (spiral_entry_affect_index = current_index; spiral_entry_affect_index >= 0; spiral_entry_affect_index--)
-		{
-			if (image_space.PixelsDistance(spiral_entry[spiral_entry.size() - 1].x, spiral_entry[spiral_entry.size() - 1].y, spiral_entry[spiral_entry_affect_index].x, spiral_entry[spiral_entry_affect_index].y) > (2.0*toolpath_size + image_space.pixel_size))
-			{
-				break;
-			}
-		}
-
-		for (int i = spiral_entry[current_index].x - 1.5*toolpath_size / image_space.pixel_size; i <= spiral_entry[current_index].x + 1.5*toolpath_size / image_space.pixel_size; i++)
-		{
-			for (int j = spiral_entry[current_index].y - 1.5*toolpath_size / image_space.pixel_size; j <= spiral_entry[current_index].y + 1.5*toolpath_size / image_space.pixel_size; j++)
-			{
-				if (image_space.check(i, j))
-				{
-					image_space.pixels[i][j].save_distance = image_space.pixels[i][j].distance_entry;
-					image_space.pixels[i][j].save_related_boundary_index = image_space.pixels[i][j].related_boundary_index_entry;
-					image_space.pixels[i][j].save_related_boundary_x = image_space.pixels[i][j].related_boundary_x_entry;
-					image_space.pixels[i][j].save_related_boundary_y = image_space.pixels[i][j].related_boundary_y_entry;
-				}
-			}
-		}
-
-		for (int i = spiral_entry[current_index].x - 1.5*toolpath_size / image_space.pixel_size; i <= spiral_entry[current_index].x + 1.5*toolpath_size / image_space.pixel_size; i++)
-		{
-			for (int j = spiral_entry[current_index].y - 1.5*toolpath_size / image_space.pixel_size; j <= spiral_entry[current_index].y + 1.5*toolpath_size / image_space.pixel_size; j++)
-			{
-				if (image_space.check(i, j))
-				{
-					double d = image_space.PixelsDistance(i, j, spiral_entry[current_index].x, spiral_entry[current_index].y) - toolpath_size / 2.0;
-
-					if (image_space.pixels[i][j].distance_entry > d&&abs(image_space.pixels[i][j].distance_entry - d)>0.00001)
-					{
-						image_space.pixels[i][j].distance_entry = d;
-						image_space.pixels[i][j].related_boundary_index_entry = current_index;
-						image_space.pixels[i][j].related_boundary_x_entry = spiral_entry[current_index].x;
-						image_space.pixels[i][j].related_boundary_y_entry = spiral_entry[current_index].y;
-					}
-				}
-			}
-		}
-
-		for (int i = spiral_entry[current_index].x - 1.5*toolpath_size / image_space.pixel_size; i <= spiral_entry[current_index].x + 1.5*toolpath_size / image_space.pixel_size; i++)
-		{
-			for (int j = spiral_entry[current_index].y - 1.5*toolpath_size / image_space.pixel_size; j <= spiral_entry[current_index].y + 1.5*toolpath_size / image_space.pixel_size; j++)
-			{
-				if (image_space.check(i, j))
-				{
-					if (image_space.pixels[i][j].distance_entry < 1.0*toolpath_size + image_space.pixel_size&&
-						!(image_space.pixels[i][j].related_boundary_x_entry == image_space.pixels[i][j].save_related_boundary_x&&
-						image_space.pixels[i][j].related_boundary_y_entry == image_space.pixels[i][j].save_related_boundary_y))
-					{
-						image_space.pixels[i][j].bool_t = true;
-						image_space.pixels[i][j].bool_t_entry_exit = true;
-						image_space.pixels[i][j].bool_t_entry = true;
-					}
-					else
-					{
-						image_space.pixels[i][j].distance_entry = image_space.pixels[i][j].save_distance;
-						image_space.pixels[i][j].related_boundary_index_entry = image_space.pixels[i][j].save_related_boundary_index;
-						image_space.pixels[i][j].related_boundary_x_entry = image_space.pixels[i][j].save_related_boundary_x;
-						image_space.pixels[i][j].related_boundary_y_entry = image_space.pixels[i][j].save_related_boundary_y;
-					}
-				}
-			}
-		}
-	}
-
-	void ToolpathGenerator::InsertPixeltoSpiralExit(PixelIndex pi)
-	{
-		image_space.pixels[pi.x][pi.y].centeraxis = true;
-		spiral_exit.push_back(pi);
-
-		for (int i = pi.x - 1.0*toolpath_size / image_space.pixel_size; i <= pi.x + 1.0*toolpath_size / image_space.pixel_size; i++)
-		{
-			for (int j = pi.y - 1.0*toolpath_size / image_space.pixel_size; j <= pi.y + 1.0*toolpath_size / image_space.pixel_size; j++)
-			{
-				if (image_space.check(i, j) && !image_space.pixels[i][j].filled)
-				{
-					if (image_space.PixelsDistance(i, j, pi.x, pi.y) <= toolpath_size / 2.0+0.00001)
-					{
-						image_space.pixels[i][j].filled = true;
-						image_space.pixels[i][j].filled_entry_exit = false;
-						image_space.pixels[i][j].filled_spiral_index = spiral_exit.size() - 1;
-					}
-				}
-			}
-		}
-
-		int current_index = spiral_exit.size() - 1;
-
-		for (spiral_exit_affect_index = current_index; spiral_exit_affect_index >= 0; spiral_exit_affect_index--)
-		{
-			if (image_space.PixelsDistance(spiral_exit[spiral_exit.size() - 1].x, spiral_exit[spiral_exit.size() - 1].y, spiral_exit[spiral_exit_affect_index].x, spiral_exit[spiral_exit_affect_index].y) > (2.0*toolpath_size + image_space.pixel_size))
-			{
-				break;
-			}
-		}
-
-		for (int i = spiral_exit[current_index].x - 1.5*toolpath_size / image_space.pixel_size; i <= spiral_exit[current_index].x + 1.5*toolpath_size / image_space.pixel_size; i++)
-		{
-			for (int j = spiral_exit[current_index].y - 1.5*toolpath_size / image_space.pixel_size; j <= spiral_exit[current_index].y + 1.5*toolpath_size / image_space.pixel_size; j++)
-			{
-				if (image_space.check(i, j))
-				{
-					image_space.pixels[i][j].save_distance = image_space.pixels[i][j].distance_exit;
-					image_space.pixels[i][j].save_related_boundary_index = image_space.pixels[i][j].related_boundary_index_exit;
-					image_space.pixels[i][j].save_related_boundary_x = image_space.pixels[i][j].related_boundary_x_exit;
-					image_space.pixels[i][j].save_related_boundary_y = image_space.pixels[i][j].related_boundary_y_exit;
-				}
-			}
-		}
-
-		for (int i = spiral_exit[current_index].x - 1.5*toolpath_size / image_space.pixel_size; i <= spiral_exit[current_index].x + 1.5*toolpath_size / image_space.pixel_size; i++)
-		{
-			for (int j = spiral_exit[current_index].y - 1.5*toolpath_size / image_space.pixel_size; j <= spiral_exit[current_index].y + 1.5*toolpath_size / image_space.pixel_size; j++)
-			{
-				if (image_space.check(i, j))
-				{
-					double d = image_space.PixelsDistance(i, j, spiral_exit[current_index].x, spiral_exit[current_index].y) - toolpath_size / 2.0;
-
-					if (image_space.pixels[i][j].distance_exit > d&&abs(image_space.pixels[i][j].distance_exit - d)>0.00001)
-					{
-						image_space.pixels[i][j].distance_exit = d;
-						image_space.pixels[i][j].related_boundary_index_exit = current_index;
-						image_space.pixels[i][j].related_boundary_x_exit = spiral_exit[current_index].x;
-						image_space.pixels[i][j].related_boundary_y_exit = spiral_exit[current_index].y;
-					}
-				}
-			}
-		}
-
-		for (int i = spiral_exit[current_index].x - 1.5*toolpath_size / image_space.pixel_size; i <= spiral_exit[current_index].x + 1.5*toolpath_size / image_space.pixel_size; i++)
-		{
-			for (int j = spiral_exit[current_index].y - 1.5*toolpath_size / image_space.pixel_size; j <= spiral_exit[current_index].y + 1.5*toolpath_size / image_space.pixel_size; j++)
-			{
-				if (image_space.check(i, j))
-				{
-					if (image_space.pixels[i][j].distance_exit < 1.0*toolpath_size + image_space.pixel_size&&
-						!(image_space.pixels[i][j].related_boundary_x_exit == image_space.pixels[i][j].save_related_boundary_x&&
-						image_space.pixels[i][j].related_boundary_y_exit == image_space.pixels[i][j].save_related_boundary_y))
-					{
-						image_space.pixels[i][j].bool_t = true;
-						image_space.pixels[i][j].bool_t_entry_exit = false;
-						image_space.pixels[i][j].bool_t_exit = true;
-					}
-					else
-					{
-						image_space.pixels[i][j].distance_exit = image_space.pixels[i][j].save_distance;
-						image_space.pixels[i][j].related_boundary_index_exit = image_space.pixels[i][j].save_related_boundary_index;
-						image_space.pixels[i][j].related_boundary_x_exit = image_space.pixels[i][j].save_related_boundary_x;
-						image_space.pixels[i][j].related_boundary_y_exit = image_space.pixels[i][j].save_related_boundary_y;
-					}
-				}
-			}
-		}
-	}
-
-	int iter_exit = 0;
-	int iter_entry = 0;
-
-	void ToolpathGenerator::SearchOneStepforSpiralExit(bool b)
-	{
-		iter_entry = 0;
-		bool goon = true;
-
-		do
-		{
-			std::cerr << iter_exit << std::endl;
-			iter_exit++;
-
-			double min_d = MAXDOUBLE;
-			int index_x = -1;
-			int index_y = -1;
-
-			std::vector<PixelIndex> perfect_index;
-			std::vector<PixelIndex> all_index;
-			std::vector<double> all_index_error;
-			std::vector<double> all_index_distance;
-			std::vector<Pixel> all_pixels;
-		
-			int c_x = spiral_exit[spiral_exit.size() - 1].x;
-			int c_y = spiral_exit[spiral_exit.size() - 1].y;
-
-			bool goon_check = true;
-			goon = false;
-
-			Polygon_2 one_contour;
-			bool one_contour_bool = false;
-			if (spiral_exit.size() > 1)
-			{
-
-				int related_boundary_x1 = image_space.pixels[spiral_exit[spiral_exit.size() - 1].x][spiral_exit[spiral_exit.size() - 1].y].related_boundary_x_entry;
-				int related_boundary_y1 = image_space.pixels[spiral_exit[spiral_exit.size() - 1].x][spiral_exit[spiral_exit.size() - 1].y].related_boundary_y_entry;
-				
-				int related_boundary_x2 = image_space.pixels[spiral_exit[spiral_exit.size() - 2].x][spiral_exit[spiral_exit.size() - 2].y].related_boundary_x_entry;
-				int related_boundary_y2 = image_space.pixels[spiral_exit[spiral_exit.size() - 2].x][spiral_exit[spiral_exit.size() - 2].y].related_boundary_y_entry;
-
-				if (related_boundary_x1 >= 0 && related_boundary_y1 >= 0 && related_boundary_x2 >= 0 && related_boundary_y2 >= 0)
-				{
-					one_contour.push_back(Point_2(image_space.pixels[spiral_exit[spiral_exit.size() - 1].x][spiral_exit[spiral_exit.size() - 1].y].center.x, image_space.pixels[spiral_exit[spiral_exit.size() - 1].x][spiral_exit[spiral_exit.size() - 1].y].center.y));
-					one_contour.push_back(Point_2(image_space.pixels[spiral_exit[spiral_exit.size() - 2].x][spiral_exit[spiral_exit.size() - 2].y].center.x, image_space.pixels[spiral_exit[spiral_exit.size() - 2].x][spiral_exit[spiral_exit.size() - 2].y].center.y));
-
-					if (related_boundary_x1 == related_boundary_x2&&related_boundary_y1 == related_boundary_y2)
-					{
-						one_contour.push_back(Point_2(image_space.pixels[related_boundary_x2][related_boundary_y2].center.x, image_space.pixels[related_boundary_x2][related_boundary_y2].center.y));
-					}
-					else
-					{
-						one_contour.push_back(Point_2(image_space.pixels[related_boundary_x2][related_boundary_y2].center.x, image_space.pixels[related_boundary_x2][related_boundary_y2].center.y));
-						one_contour.push_back(Point_2(image_space.pixels[related_boundary_x1][related_boundary_y1].center.x, image_space.pixels[related_boundary_x1][related_boundary_y1].center.y));
-					}
-					one_contour_bool = true;
-				}
-			}
-
-			for (int i = -1; i <= 1 && goon_check; i++)
-			{
-				for (int j = -1; j <= 1 && goon_check; j++)
-				{
-					if (image_space.check(spiral_exit[spiral_exit.size() - 1].x + i, spiral_exit[spiral_exit.size() - 1].y + j))
-					{
-						Pixel &p = image_space.pixels[spiral_exit[spiral_exit.size() - 1].x + i][spiral_exit[spiral_exit.size() - 1].y + j];
-
-						int current_index_x = spiral_exit[spiral_exit.size() - 1].x + i;
-						int current_index_y = spiral_exit[spiral_exit.size() - 1].y + j;
-
-						if (p.inside&&!p.centeraxis)
-						{
-							bool use_this_pixel = true;
-
-							if (image_space.pixels[current_index_x][current_index_y].failure_nb >= 2)
-							{
-								use_this_pixel = false;
-							}
-
-							if (spiral_exit.size() == 1||first_two_step_bool)
-							{
-								for (int x = current_index_x - toolpath_size / image_space.pixel_size; x <= current_index_x + toolpath_size / image_space.pixel_size; x++)
-								{
-									for (int y = current_index_y - toolpath_size / image_space.pixel_size; y <= current_index_y + 1.0*toolpath_size / image_space.pixel_size; y++)
-									{
-										if (image_space.check(x, y) && image_space.PixelsDistance(current_index_x, current_index_y, x, y) <= toolpath_size / 2.0 + 0.00001&& use_this_pixel)
-										{
-											if (image_space.pixels[x][y].filled&&image_space.pixels[x][y].filled_entry_exit)
-											{
-												use_this_pixel = false;
-												break;
-											}
-										}
-									}
-								}
-							}
-				
-							//if (false)
-							if (spiral_exit.size() > 1)
-							{
-								int related_boundary_x_entry = image_space.pixels[current_index_x][current_index_y].related_boundary_x_entry;
-								int related_boundary_y_entry = image_space.pixels[current_index_x][current_index_y].related_boundary_y_entry;
-
-								if (image_space.pixels[spiral_exit[spiral_exit.size() - 1].x][spiral_exit[spiral_exit.size() - 1].y].related_boundary_x_entry == related_boundary_x_entry&&
-									image_space.pixels[spiral_exit[spiral_exit.size() - 1].x][spiral_exit[spiral_exit.size() - 1].y].related_boundary_y_entry == related_boundary_y_entry&&
-									image_space.pixels[spiral_exit[spiral_exit.size() - 2].x][spiral_exit[spiral_exit.size() - 2].y].related_boundary_x_entry == related_boundary_x_entry&&
-									image_space.pixels[spiral_exit[spiral_exit.size() - 2].x][spiral_exit[spiral_exit.size() - 2].y].related_boundary_y_entry == related_boundary_y_entry)
-								{
-									Vector2d v0 = image_space.pixels[spiral_exit[spiral_exit.size() - 1].x][spiral_exit[spiral_exit.size() - 1].y].center - image_space.pixels[related_boundary_x_entry][related_boundary_y_entry].center;
-									Vector2d v1 = image_space.pixels[spiral_exit[spiral_exit.size() - 2].x][spiral_exit[spiral_exit.size() - 2].y].center - image_space.pixels[related_boundary_x_entry][related_boundary_y_entry].center;
-									Vector2d v2 = image_space.pixels[current_index_x][current_index_y].center - image_space.pixels[related_boundary_x_entry][related_boundary_y_entry].center;
-
-									if ((v1[0] * v0[1] - v1[1] * v0[0])*(v2[0] * v0[1] - v2[1] * v0[0]) > 0)
-									{
-										use_this_pixel = false;
-									}
-								}
-							}
-						
-							if (one_contour_bool&&one_contour.is_simple())
-							{
-								if (one_contour.bounded_side(Point_2(image_space.pixels[current_index_x][current_index_y].center.x, image_space.pixels[current_index_x][current_index_y].center.y)) == CGAL::ON_UNBOUNDED_SIDE)
-								{
-									int related_boundary_x_entry = image_space.pixels[current_index_x][current_index_y].related_boundary_x_entry;
-									int related_boundary_y_entry = image_space.pixels[current_index_x][current_index_y].related_boundary_y_entry;
-
-									int related_boundary_x1 = image_space.pixels[spiral_exit[spiral_exit.size() - 1].x][spiral_exit[spiral_exit.size() - 1].y].related_boundary_x_entry;
-									int related_boundary_y1 = image_space.pixels[spiral_exit[spiral_exit.size() - 1].x][spiral_exit[spiral_exit.size() - 1].y].related_boundary_y_entry;
-
-									if (related_boundary_x_entry == related_boundary_x1&&related_boundary_y_entry == related_boundary_y1)
-									{
-										Point_2 p0(image_space.pixels[current_index_x][current_index_y].center.x, image_space.pixels[current_index_x][current_index_y].center.y);
-										Point_2 p1(image_space.pixels[related_boundary_x_entry][related_boundary_y_entry].center.x, image_space.pixels[related_boundary_x_entry][related_boundary_y_entry].center.y);
-
-										Segment_2 s0(p0, p1);
-
-										bool center_bool = false;
-
-										if (one_contour.bounded_side(Point_2(image_space.pixels[current_index_x][current_index_y].center.x, image_space.pixels[current_index_x][current_index_y].center.y)) != CGAL::ON_BOUNDARY)
-										{
-											center_bool = true;
-										}
-
-										bool related_bool = false;
-
-										std::vector<Point_2> ignore_ps;
-
-										int ver_nb = 0;
-										for (Polygon_2::Vertex_iterator ver_iter = one_contour.vertices_begin(); ver_iter != one_contour.vertices_end(); ver_iter++)
-										{
-											ver_nb++;
-										}
-										for (Polygon_2::Vertex_iterator ver_iter = one_contour.vertices_begin(); ver_iter != one_contour.vertices_end(); ver_iter++)
-										{
-
-											double  xxx1 = ver_iter->x();
-											double  xxx2 = ver_iter->y();
-
-											Polygon_2::Vertex_iterator pre_ver_iter0 = one_contour.vertices_begin();
-											Polygon_2::Vertex_iterator pre_ver_iter1 = one_contour.vertices_begin() + 1;
-											Polygon_2::Vertex_iterator pre_ver_iter2 = one_contour.vertices_begin() + 2;
-
-											if (abs(ver_iter->x() - p1.x()) < 0.0000001&&abs(ver_iter->y() - p1.y()) < 0.0000001)
-											{
-												related_bool = true;
-												ignore_ps.push_back(Point_2(p1.x(), p1.y()));
-
-												if (ver_iter == one_contour.vertices_begin())
-												{
-													Polygon_2::Vertex_iterator pre_ver_iter = one_contour.vertices_begin() + ver_nb - 1;
-													ignore_ps.push_back(Point_2(pre_ver_iter->x(), pre_ver_iter->y()));
-												}
-												else
-												{
-													Polygon_2::Vertex_iterator pre_ver_iter = ver_iter - 1;
-													ignore_ps.push_back(Point_2(pre_ver_iter->x(), pre_ver_iter->y()));
-												}
-
-												Polygon_2::Vertex_iterator next_ver_iter = ver_iter + 1;
-												if (next_ver_iter == one_contour.vertices_end())
-												{
-													ignore_ps.push_back(Point_2(one_contour.vertices_begin()->x(), one_contour.vertices_begin()->y()));
-												}
-												else
-												{
-													ignore_ps.push_back(Point_2(next_ver_iter->x(), next_ver_iter->y()));
-												}
-												break;
-											}
-										}
-
-										for (Polygon_2::Edge_const_iterator edge_iter = one_contour.edges_begin(); edge_iter != one_contour.edges_end(); edge_iter++)
-										{
-											Segment_2 s1(edge_iter->source(), edge_iter->target());
-											CGAL::Object result = CGAL::intersection(s0, s1);
-											if (const Point_2 *ipoint = CGAL::object_cast<Point_2 >(&result)) {
-												if (related_bool)
-												{
-													if (ignore_ps.size() == 3)
-													{
-														if (!(abs(ignore_ps[0].x() - ipoint->x()) < 0.0000001&&abs(ignore_ps[0].y() - ipoint->y()) < 0.0000001) &&
-															!(abs(ignore_ps[1].x() - ipoint->x()) < 0.0000001&&abs(ignore_ps[1].y() - ipoint->y()) < 0.0000001) &&
-															!(abs(ignore_ps[2].x() - ipoint->x()) < 0.0000001&&abs(ignore_ps[2].y() - ipoint->y()) < 0.0000001))
-														{
-															use_this_pixel = false;
-															break;
-														}
-													}
-												}
-												else
-												{
-													use_this_pixel = false;
-													break;
-												}
-											}
-											else
-												if (const Segment_2 *iseg = CGAL::object_cast<Segment_2>(&result)) {
-
-												}
-												else {
-
-												}
-										}
-										std::vector<Point_2>().swap(ignore_ps);
-									}
-								}
-								else
-								{
-									use_this_pixel = false;
-								}
-							}
-
-							if (spiral_exit_affect_index > 0 && !first_two_step_bool)
-							{
-								if (spiral_exit.size()>0 && image_space.pixels[current_index_x][current_index_y].related_boundary_x_entry >= 0 && image_space.pixels[current_index_x][current_index_y].related_boundary_y_entry >= 0)
-								{
-									if (image_space.pixels[spiral_exit[spiral_exit.size() - 1].x][spiral_exit[spiral_exit.size() - 1].y].related_boundary_x_entry >= 0 && image_space.pixels[spiral_exit[spiral_exit.size() - 1].x][spiral_exit[spiral_exit.size() - 1].y].related_boundary_y_entry >= 0)
-									{
-										int int1 = image_space.pixels[image_space.pixels[current_index_x][current_index_y].related_boundary_x_entry][image_space.pixels[current_index_x][current_index_y].related_boundary_y_entry].boundary_index;
-										int int2 = image_space.pixels[image_space.pixels[spiral_exit[spiral_exit.size() - 1].x][spiral_exit[spiral_exit.size() - 1].y].related_boundary_x_entry][image_space.pixels[spiral_exit[spiral_exit.size() - 1].x][spiral_exit[spiral_exit.size() - 1].y].related_boundary_y_entry].boundary_index;
-
-										if (int1 >= 0 && int2 >= 0)
-										{
-											if (int2 - int1 > 0)
-											{
-												if (spiral_direction)
-												{
-													use_this_pixel = false;
-												}
-											}
-
-											if (int2 - int1 < 0)
-											{
-												if (!spiral_direction)
-												{
-													use_this_pixel = false;
-												}
-											}
-										}
-									}
-								}
-							}
-
-							if (first_two_step_bool)
-							for (int x = current_index_x - toolpath_size / image_space.pixel_size; x <= current_index_x + toolpath_size / image_space.pixel_size; x++)
-							{
-								for (int y = current_index_y - toolpath_size / image_space.pixel_size; y <= current_index_y + 1.0*toolpath_size / image_space.pixel_size; y++)
-								{
-									if (image_space.check(x, y) && image_space.PixelsDistance(current_index_x, current_index_y, x, y) <toolpath_size / 2.0)
-									{
-										if (image_space.pixels[x][y].related_boundary_x_entry >= 0 && image_space.pixels[x][y].related_boundary_y_entry >= 0)
-										{
-											if (image_space.pixels[x][y].related_boundary_index_entry >= 0 && image_space.pixels[x][y].related_boundary_index_entry >= spiral_entry_affect_index - 1)
-											{
-												if (abs(image_space.pixels[x][y].related_boundary_index_entry - image_space.pixels[spiral_exit[spiral_exit.size() - 1].x][spiral_exit[spiral_exit.size() - 1].y].related_boundary_index_entry) <= 1.0*toolpath_size / image_space.pixel_size)
-												{
-													if (image_space.pixels[x][y].bool_t&&image_space.pixels[x][y].bool_t_entry)
-													{
-														goon_check = false;
-														break;
-													}
-												}
-											}
-										}
-									}
-								}
-							}
-
-							if (first_two_step_bool)
-							{
-								if (image_space.pixels[current_index_x][current_index_y].related_boundary_index_entry >= 0 && image_space.pixels[current_index_x][current_index_y].related_boundary_index_entry >= spiral_entry_affect_index - 1)
-								{
-									use_this_pixel = false;
-								}
-							}
-
-							if (false)
-							if (spiral_exit.size()>0 && image_space.pixels[current_index_x][current_index_y].related_boundary_x_entry >= 0 && image_space.pixels[current_index_x][current_index_y].related_boundary_y_entry >= 0)
-							{
-								if (image_space.pixels[spiral_exit[spiral_exit.size() - 1].x][spiral_exit[spiral_exit.size() - 1].y].related_boundary_x_entry >= 0 && image_space.pixels[spiral_exit[spiral_exit.size() - 1].x][spiral_exit[spiral_exit.size() - 1].y].related_boundary_y_entry >= 0)
-								{
-									if (image_space.pixels[current_index_x][current_index_y].related_boundary_index_entry >= 0 && image_space.pixels[spiral_exit[spiral_exit.size() - 1].x][spiral_exit[spiral_exit.size() - 1].y].related_boundary_index_entry>=0)
-									{
-										if (image_space.pixels[current_index_x][current_index_y].related_boundary_index_entry < image_space.pixels[spiral_exit[spiral_exit.size() - 1].x][spiral_exit[spiral_exit.size() - 1].y].related_boundary_index_entry)
-										{
-											use_this_pixel = false;
-										}
-									}
-								}
-							}
-
-							if (use_this_pixel)
-							{
-								if (first_two_step_bool)
-								{
-									if (abs(p.distance_entry - toolpath_size / 2.0) < 0.0001)
-									{
-										perfect_index.push_back(PixelIndex(spiral_exit[spiral_exit.size() - 1].x + i, spiral_exit[spiral_exit.size() - 1].y + j));
-									}
-
-									all_index.push_back(PixelIndex(i, j));
-									all_index_error.push_back(abs(p.distance_entry - toolpath_size / 2.0));
-									all_index_distance.push_back(p.distance_entry);
-
-									all_pixels.push_back(p);
-
-									if (abs(p.distance_entry - toolpath_size / 2.0) < min_d)
-									{
-										min_d = abs(p.distance_entry - toolpath_size / 2.0);
-										index_x = spiral_exit[spiral_exit.size() - 1].x + i;
-										index_y = spiral_exit[spiral_exit.size() - 1].y + j;
-										goon = true;
-									}
-								}
-								else
-								{
-									if (abs(p.distance - toolpath_size / 2.0) < 0.0001)
-									{
-										perfect_index.push_back(PixelIndex(spiral_exit[spiral_exit.size() - 1].x + i, spiral_exit[spiral_exit.size() - 1].y + j));
-									}
-
-									all_index.push_back(PixelIndex(i, j));
-									all_index_error.push_back(abs(p.distance - toolpath_size / 2.0));
-									all_index_distance.push_back(p.distance);
-
-									all_pixels.push_back(p);
-
-									if (abs(p.distance - toolpath_size / 2.0) < min_d)
-									{
-										min_d = abs(p.distance - toolpath_size / 2.0);
-										index_x = spiral_exit[spiral_exit.size() - 1].x + i;
-										index_y = spiral_exit[spiral_exit.size() - 1].y + j;
-										goon = true;
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-
-			if (!goon_check)
-			{
-				goon = false;
-			}
-
-			if (goon)
-			{
-				if (perfect_index.size() > 1)
-				{
-					int spiral_index_min = (int)MAXDOUBLE;
-					int spiral_index;
-					for (int i = 0; i < perfect_index.size(); i++)
-					{
-						if (image_space.pixels[perfect_index[i].x][perfect_index[i].y].related_boundary_index_entry >= image_space.pixels[spiral_exit[spiral_exit.size() - 1].x][spiral_exit[spiral_exit.size() - 1].y].related_boundary_index_entry)
-						{
-							if (spiral_index_min > image_space.pixels[perfect_index[i].x][perfect_index[i].y].related_boundary_index_entry)
-							{
-								spiral_index_min = image_space.pixels[perfect_index[i].x][perfect_index[i].y].related_boundary_index_entry;
-								spiral_index = i;
-							}
-						}
-					}
-
-					index_x = perfect_index[spiral_index].x;
-					index_y = perfect_index[spiral_index].y;
-					goon = true;
-				}
-				else
-				{
-					int index_x_x = index_x;
-					int index_y_y = index_y;
-
-					if (spiral_exit.size() >= 2)
-					{
-						double max_distance_temp = image_space.PixelsDistance(index_x, index_y, spiral_exit[spiral_exit.size() - 2].x, spiral_exit[spiral_exit.size() - 2].y);
-
-						for (int i = 0; i < all_index_error.size(); i++)
-						{
-							if (!(all_index[i].x == (index_x - spiral_exit[spiral_exit.size() - 1].x) && all_index[i].y == (index_y - spiral_exit[spiral_exit.size() - 1].y)))
-							{
-								if (abs(all_index_error[i] - min_d) < 0.0001)
-								{
-									double distance_temp = image_space.PixelsDistance(spiral_exit[spiral_exit.size() - 1].x + all_index[i].x, spiral_exit[spiral_exit.size() - 1].y + all_index[i].y, spiral_exit[spiral_exit.size() - 2].x, spiral_exit[spiral_exit.size() - 2].y);
-
-									if (image_space.pixels[index_x_x][index_y_y].related_boundary_index_entry == image_space.pixels[spiral_exit[spiral_exit.size() - 1].x + all_index[i].x][spiral_exit[spiral_exit.size() - 1].y + all_index[i].y].related_boundary_index_entry)
-									{
-										if (max_distance_temp < distance_temp)
-										{
-											max_distance_temp = distance_temp;
-
-											index_x_x = spiral_exit[spiral_exit.size() - 1].x + all_index[i].x;
-											index_y_y = spiral_exit[spiral_exit.size() - 1].y + all_index[i].y;
-										}
-									}
-									else
-									{
-										if (image_space.pixels[index_x_x][index_y_y].related_boundary_index_entry<image_space.pixels[spiral_exit[spiral_exit.size() - 1].x + all_index[i].x][spiral_exit[spiral_exit.size() - 1].y + all_index[i].y].related_boundary_index_entry)
-										{
-											max_distance_temp = distance_temp;
-											index_x_x = spiral_exit[spiral_exit.size() - 1].x + all_index[i].x;
-											index_y_y = spiral_exit[spiral_exit.size() - 1].y + all_index[i].y;
-										}
-									}
-								}
-							}
-						}
-					}
-
-					index_x = index_x_x;
-					index_y = index_y_y;
-				}
-			}
-		
-
-			if (goon&&!first_two_step_bool)
-			{
-				for (int x = index_x - toolpath_size / image_space.pixel_size; x <= index_x + toolpath_size / image_space.pixel_size; x++)
-				{
-					for (int y = index_y - toolpath_size / image_space.pixel_size; y <= index_y + toolpath_size / image_space.pixel_size; y++)
-					{
-						if (image_space.check(x, y) && image_space.PixelsDistance(index_x, index_y, x, y) <toolpath_size / 2.0 &&goon)
-						{
-							if (image_space.pixels[x][y].filled&&image_space.pixels[x][y].filled_entry_exit)
-							{
-								goon = false;
-								break;
-							}
-						}
-					}
-				}
-			}
-			
-			for (int i = 0; i < all_index.size(); i++)
-			{
-				if (!(index_x == spiral_exit[spiral_exit.size() - 1].x + all_index[i].x&&
-					index_y == spiral_exit[spiral_exit.size() - 1].y + all_index[i].y))
-				{
-					image_space.pixels[spiral_exit[spiral_exit.size() - 1].x + all_index[i].x][spiral_exit[spiral_exit.size() - 1].y + all_index[i].y].failure_nb++;
-				}
-			}
-
-			std::vector<PixelIndex>().swap(perfect_index);
-			std::vector<PixelIndex>().swap(all_index);
-			std::vector<double>().swap(all_index_error);
-			std::vector<double>().swap(all_index_distance);
-			std::vector<Pixel>().swap(all_pixels);
-			if (goon)
-			{
-				InsertPixeltoSpiralExit(PixelIndex(index_x, index_y));
 			}
 			else
 			{
-				std::cout << "Over..." << std::endl;
-				break;
+				assert(false);
 			}
-
-			if (!b)
-			{
-				break;
-			}
-		} while (goon);
-	}
-
-	void ToolpathGenerator::SearchOneStepforSpiralEntry(bool b)
-	{
-		iter_exit = 0;
-		bool goon = true;
-
-		do
-		{
-			//std::cerr << entry_number<<" / "<<iter_entry << std::endl;
-			iter_entry++;
-
-			double min_d = MAXDOUBLE;
-			int index_x = -1;
-			int index_y = -1;
-
-			std::vector<PixelIndex> perfect_index;
-			std::vector<PixelIndex> all_index;
-			std::vector<double> all_index_error;
-			std::vector<double> all_index_distance;
-			std::vector<Pixel> all_pixels;
-			bool goon_check = true;
-			goon = false;
-
-			Polygon_2 one_contour;
-			bool one_contour_bool = false;
-			if (spiral_entry.size() > 1)
-			{
-				int related_boundary_x1 = image_space.pixels[spiral_entry[spiral_entry.size() - 1].x][spiral_entry[spiral_entry.size() - 1].y].related_boundary_x_exit;
-				int related_boundary_y1 = image_space.pixels[spiral_entry[spiral_entry.size() - 1].x][spiral_entry[spiral_entry.size() - 1].y].related_boundary_y_exit;
-
-				int related_boundary_x2 = image_space.pixels[spiral_entry[spiral_entry.size() - 2].x][spiral_entry[spiral_entry.size() - 2].y].related_boundary_x_exit;
-				int related_boundary_y2 = image_space.pixels[spiral_entry[spiral_entry.size() - 2].x][spiral_entry[spiral_entry.size() - 2].y].related_boundary_y_exit;
-
-				if (related_boundary_x1 >= 0 && related_boundary_y1 >= 0 && related_boundary_x2 >= 0 && related_boundary_y2 >= 0)
-				{
-					int int11 = spiral_entry[spiral_entry.size() - 1].x;
-					int int12 = spiral_entry[spiral_entry.size() - 1].y;
-
-					int int21 = spiral_entry[spiral_entry.size() - 2].x;
-					int int22 = spiral_entry[spiral_entry.size() - 2].y;
-
-					one_contour.push_back(Point_2(image_space.pixels[spiral_entry[spiral_entry.size() - 1].x][spiral_entry[spiral_entry.size() - 1].y].center.x, image_space.pixels[spiral_entry[spiral_entry.size() - 1].x][spiral_entry[spiral_entry.size() - 1].y].center.y));
-					one_contour.push_back(Point_2(image_space.pixels[spiral_entry[spiral_entry.size() - 2].x][spiral_entry[spiral_entry.size() - 2].y].center.x, image_space.pixels[spiral_entry[spiral_entry.size() - 2].x][spiral_entry[spiral_entry.size() - 2].y].center.y));
-
-					if (related_boundary_x1 == related_boundary_x2&&related_boundary_y1 == related_boundary_y2)
-					{
-						one_contour.push_back(Point_2(image_space.pixels[related_boundary_x2][related_boundary_y2].center.x, image_space.pixels[related_boundary_x2][related_boundary_y2].center.y));
-					}
-					else
-					{
-						one_contour.push_back(Point_2(image_space.pixels[related_boundary_x2][related_boundary_y2].center.x, image_space.pixels[related_boundary_x2][related_boundary_y2].center.y));
-						one_contour.push_back(Point_2(image_space.pixels[related_boundary_x1][related_boundary_y1].center.x, image_space.pixels[related_boundary_x1][related_boundary_y1].center.y));
-					}
-					one_contour_bool = true;
-				}
-			}
-
-			for (int i = -1; i <= 1 && goon_check; i++)
-			{
-				for (int j = -1; j <= 1 && goon_check; j++)
-				{
-					if (image_space.check(spiral_entry[spiral_entry.size() - 1].x + i, spiral_entry[spiral_entry.size() - 1].y + j))
-					{
-						Pixel &p = image_space.pixels[spiral_entry[spiral_entry.size() - 1].x + i][spiral_entry[spiral_entry.size() - 1].y + j];
-
-						int current_index_x = spiral_entry[spiral_entry.size() - 1].x + i;
-						int current_index_y = spiral_entry[spiral_entry.size() - 1].y + j;
-						
-				
-
-						if (p.inside&&!p.centeraxis)
-						{
-							bool use_this_pixel = true;
-
-							if (image_space.pixels[current_index_x][current_index_y].failure_nb >= 2)
-							{
-								use_this_pixel = false;
-							}
-
-							if (spiral_entry.size() == 1 || first_two_step_bool)
-							{
-								for (int x = current_index_x - toolpath_size / image_space.pixel_size; x <= current_index_x + toolpath_size / image_space.pixel_size; x++)
-								{
-									for (int y = current_index_y - toolpath_size / image_space.pixel_size; y <= current_index_y + 1.0*toolpath_size / image_space.pixel_size; y++)
-									{
-										if (image_space.check(x, y) && image_space.PixelsDistance(current_index_x, current_index_y, x, y) <toolpath_size / 2.0&&use_this_pixel)
-										{
-											if (image_space.pixels[x][y].filled&&!image_space.pixels[x][y].filled_entry_exit)
-											{
-												use_this_pixel = false;
-												break;
-											}
-										}
-									}
-								}
-							}
-
-							if (one_contour_bool&&one_contour.is_simple())
-							{
-								if (one_contour.bounded_side(Point_2(image_space.pixels[current_index_x][current_index_y].center.x, image_space.pixels[current_index_x][current_index_y].center.y)) == CGAL::ON_UNBOUNDED_SIDE)
-								{
-									int related_boundary_x_exit = image_space.pixels[current_index_x][current_index_y].related_boundary_x_exit;
-									int related_boundary_y_exit = image_space.pixels[current_index_x][current_index_y].related_boundary_y_exit;
-
-									int related_boundary_x1 = image_space.pixels[spiral_entry[spiral_entry.size() - 1].x][spiral_entry[spiral_entry.size() - 1].y].related_boundary_x_exit;
-									int related_boundary_y1 = image_space.pixels[spiral_entry[spiral_entry.size() - 1].x][spiral_entry[spiral_entry.size() - 1].y].related_boundary_y_exit;
-
-									if (related_boundary_x_exit == related_boundary_x1&&related_boundary_y_exit == related_boundary_y1)
-									{
-										Point_2 p0(image_space.pixels[current_index_x][current_index_y].center.x, image_space.pixels[current_index_x][current_index_y].center.y);
-										Point_2 p1(image_space.pixels[related_boundary_x_exit][related_boundary_y_exit].center.x, image_space.pixels[related_boundary_x_exit][related_boundary_y_exit].center.y);
-
-										Segment_2 s0(p0, p1);
-
-										bool related_bool = false;
-
-										std::vector<Point_2> ignore_ps;
-
-										int ver_nb = 0;
-										for (Polygon_2::Vertex_iterator ver_iter = one_contour.vertices_begin(); ver_iter != one_contour.vertices_end(); ver_iter++)
-										{
-											ver_nb++;
-										}
-										for (Polygon_2::Vertex_iterator ver_iter = one_contour.vertices_begin(); ver_iter != one_contour.vertices_end(); ver_iter++)
-										{
-											double  xxx1 = ver_iter->x();
-											double  xxx2 = ver_iter->y();
-
-											Polygon_2::Vertex_iterator pre_ver_iter0 = one_contour.vertices_begin();
-											Polygon_2::Vertex_iterator pre_ver_iter1 = one_contour.vertices_begin() + 1;
-											Polygon_2::Vertex_iterator pre_ver_iter2 = one_contour.vertices_begin() + 2;
-
-											if (abs(ver_iter->x() - p1.x()) < 0.0000001&&abs(ver_iter->y() - p1.y()) < 0.0000001)
-											{
-												related_bool = true;
-												ignore_ps.push_back(Point_2(p1.x(), p1.y()));
-
-												if (ver_iter == one_contour.vertices_begin())
-												{
-													Polygon_2::Vertex_iterator pre_ver_iter = one_contour.vertices_begin() + ver_nb - 1;
-													ignore_ps.push_back(Point_2(pre_ver_iter->x(), pre_ver_iter->y()));
-												}
-												else
-												{
-													Polygon_2::Vertex_iterator pre_ver_iter = ver_iter - 1;
-													ignore_ps.push_back(Point_2(pre_ver_iter->x(), pre_ver_iter->y()));
-												}
-
-												Polygon_2::Vertex_iterator next_ver_iter = ver_iter + 1;
-												if (next_ver_iter == one_contour.vertices_end())
-												{
-													ignore_ps.push_back(Point_2(one_contour.vertices_begin()->x(), one_contour.vertices_begin()->y()));
-												}
-												else
-												{
-													ignore_ps.push_back(Point_2(next_ver_iter->x(), next_ver_iter->y()));
-												}
-												break;
-											}
-										}
-
-										for (Polygon_2::Edge_const_iterator edge_iter = one_contour.edges_begin(); edge_iter != one_contour.edges_end(); edge_iter++)
-										{
-											Segment_2 s1(edge_iter->source(), edge_iter->target());
-											CGAL::Object result = CGAL::intersection(s0, s1);
-											if (const Point_2 *ipoint = CGAL::object_cast<Point_2 >(&result)) {
-
-												if (related_bool)
-												{
-													if (ignore_ps.size() == 3)
-													{
-														if (!(abs(ignore_ps[0].x() - ipoint->x()) < 0.0000001&&abs(ignore_ps[0].y() - ipoint->y()) < 0.0000001) &&
-															!(abs(ignore_ps[1].x() - ipoint->x()) < 0.0000001&&abs(ignore_ps[1].y() - ipoint->y()) < 0.0000001) &&
-															!(abs(ignore_ps[2].x() - ipoint->x()) < 0.0000001&&abs(ignore_ps[2].y() - ipoint->y()) < 0.0000001))
-														{
-															use_this_pixel = false;
-															break;
-														}
-													}
-												}
-												else
-												{
-													use_this_pixel = false;
-													break;
-												}
-
-											}
-											else
-												if (const Segment_2 *iseg = CGAL::object_cast<Segment_2>(&result)) {
-
-												}
-												else {
-
-												}
-										}
-										std::vector<Point_2>().swap(ignore_ps);
-									}
-								}
-								else
-								{
-									use_this_pixel = false;
-								}
-							}
-
-							//if (false)
-							if (spiral_entry.size() > 1)
-							{
-								int related_boundary_x_exit = image_space.pixels[current_index_x][current_index_y].related_boundary_x_exit;
-								int related_boundary_y_exit = image_space.pixels[current_index_x][current_index_y].related_boundary_y_exit;
-
-								if (image_space.pixels[spiral_entry[spiral_entry.size() - 1].x][spiral_entry[spiral_entry.size() - 1].y].related_boundary_x_exit == related_boundary_x_exit&&
-									image_space.pixels[spiral_entry[spiral_entry.size() - 1].x][spiral_entry[spiral_entry.size() - 1].y].related_boundary_y_exit == related_boundary_y_exit&&
-									image_space.pixels[spiral_entry[spiral_entry.size() - 2].x][spiral_entry[spiral_entry.size() - 2].y].related_boundary_x_exit == related_boundary_x_exit&&
-									image_space.pixels[spiral_entry[spiral_entry.size() - 2].x][spiral_entry[spiral_entry.size() - 2].y].related_boundary_y_exit == related_boundary_y_exit)
-								{
-									Vector2d v0 = image_space.pixels[spiral_entry[spiral_entry.size() - 1].x][spiral_entry[spiral_entry.size() - 1].y].center - image_space.pixels[related_boundary_x_exit][related_boundary_y_exit].center;
-									Vector2d v1 = image_space.pixels[spiral_entry[spiral_entry.size() - 2].x][spiral_entry[spiral_entry.size() - 2].y].center - image_space.pixels[related_boundary_x_exit][related_boundary_y_exit].center;
-									Vector2d v2 = image_space.pixels[current_index_x][current_index_y].center - image_space.pixels[related_boundary_x_exit][related_boundary_y_exit].center;
-
-									if ((v1[0] * v0[1] - v1[1] * v0[0])*(v2[0] * v0[1] - v2[1] * v0[0]) > 0)
-									{
-										use_this_pixel = false;
-									}
-								}
-							}
-
-							if (spiral_entry_affect_index > 0 && !first_two_step_bool)
-							{
-								if (spiral_entry.size()>0 && image_space.pixels[current_index_x][current_index_y].related_boundary_x_exit >= 0 && image_space.pixels[current_index_x][current_index_y].related_boundary_y_exit >= 0)
-								{
-									if (image_space.pixels[spiral_entry[spiral_entry.size() - 1].x][spiral_entry[spiral_entry.size() - 1].y].related_boundary_x_exit >= 0 && image_space.pixels[spiral_entry[spiral_entry.size() - 1].x][spiral_entry[spiral_entry.size() - 1].y].related_boundary_y_exit >= 0)
-									{
-										int int1 = image_space.pixels[image_space.pixels[current_index_x][current_index_y].related_boundary_x_exit][image_space.pixels[current_index_x][current_index_y].related_boundary_y_exit].boundary_index;
-										int int2 = image_space.pixels[image_space.pixels[spiral_entry[spiral_entry.size() - 1].x][spiral_entry[spiral_entry.size() - 1].y].related_boundary_x_exit][image_space.pixels[spiral_entry[spiral_entry.size() - 1].x][spiral_entry[spiral_entry.size() - 1].y].related_boundary_y_exit].boundary_index;
-
-										if (int1 >= 0 && int2 >= 0)
-										{
-											if (int2 - int1 > 0)
-											{
-												if (spiral_direction)
-												{
-													use_this_pixel = false;
-												}
-											}
-
-											if (int2 - int1 < 0)
-											{
-												if (!spiral_direction)
-												{
-													use_this_pixel = false;
-												}
-											}
-										}
-									}
-								}
-							}
-
-							if (first_two_step_bool)
-							for (int x = current_index_x - toolpath_size / image_space.pixel_size; x <= current_index_x + toolpath_size / image_space.pixel_size; x++)
-							{
-								for (int y = current_index_y - toolpath_size / image_space.pixel_size; y <= current_index_y + 1.0*toolpath_size / image_space.pixel_size; y++)
-								{
-									if (image_space.check(x, y) && image_space.PixelsDistance(current_index_x, current_index_y, x, y) <toolpath_size / 2.0)
-									{
-										if (image_space.pixels[x][y].related_boundary_x_exit >= 0 && image_space.pixels[x][y].related_boundary_y_exit >= 0)
-										{
-											if (image_space.pixels[x][y].related_boundary_index_exit >= 0 && image_space.pixels[x][y].related_boundary_index_exit >= spiral_exit_affect_index - 1)
-											{
-												Pixel &p = image_space.pixels[x][y];
-
-												if (abs(image_space.pixels[x][y].related_boundary_index_exit - image_space.pixels[spiral_entry[spiral_entry.size() - 1].x][spiral_entry[spiral_entry.size() - 1].y].related_boundary_index_exit)<=1.0*toolpath_size/image_space.pixel_size)
-												{
-													if (image_space.pixels[x][y].bool_t&&image_space.pixels[x][y].bool_t_exit)
-													{
-														goon_check = false;
-														break;
-													}
-												}
-											}
-										}
-									}
-								}
-							}
-							
-							if (first_two_step_bool)
-							{
-								if (image_space.pixels[current_index_x][current_index_y].related_boundary_index_exit >= 0 && image_space.pixels[current_index_x][current_index_y].related_boundary_index_exit >= spiral_exit_affect_index - 1)
-								{
-									use_this_pixel = false;
-								}
-							}
-
-							if (false)
-							if (spiral_entry.size()>0 && image_space.pixels[current_index_x][current_index_y].related_boundary_x_exit >= 0 && image_space.pixels[current_index_x][current_index_y].related_boundary_y_exit >= 0)
-							{
-								if (image_space.pixels[spiral_entry[spiral_entry.size() - 1].x][spiral_entry[spiral_entry.size() - 1].y].related_boundary_x_exit >= 0 && image_space.pixels[spiral_entry[spiral_entry.size() - 1].x][spiral_entry[spiral_entry.size() - 1].y].related_boundary_y_exit >= 0)
-								{
-									int dsadsad = image_space.pixels[current_index_x][current_index_y].related_boundary_index_exit;
-									int dsadasdas = image_space.pixels[spiral_entry[spiral_entry.size() - 1].x][spiral_entry[spiral_entry.size() - 1].y].related_boundary_index_exit;
-
-									if (image_space.pixels[current_index_x][current_index_y].related_boundary_index_exit >= 0 && image_space.pixels[spiral_entry[spiral_entry.size() - 1].x][spiral_entry[spiral_entry.size() - 1].y].related_boundary_index_exit>=0)
-									{
-										if (image_space.pixels[current_index_x][current_index_y].related_boundary_index_exit < image_space.pixels[spiral_entry[spiral_entry.size() - 1].x][spiral_entry[spiral_entry.size() - 1].y].related_boundary_index_exit)
-										{
-											use_this_pixel = false;
-										}
-									}
-							
-								}
-							}
-
-							if (use_this_pixel)
-							{
-								if (first_two_step_bool)
-								{
-									if (abs(p.distance_exit - toolpath_size / 2.0) < 0.0001)
-									{
-										perfect_index.push_back(PixelIndex(spiral_entry[spiral_entry.size() - 1].x + i, spiral_entry[spiral_entry.size() - 1].y + j));
-									}
-
-									all_index.push_back(PixelIndex(i, j));
-									all_index_error.push_back(abs(p.distance_exit - toolpath_size / 2.0));
-									all_index_distance.push_back(p.distance_exit);
-									all_pixels.push_back(p);
-
-									if (abs(p.distance_exit - toolpath_size / 2.0) < min_d)
-									{
-										min_d = abs(p.distance_exit - toolpath_size / 2.0);
-										index_x = spiral_entry[spiral_entry.size() - 1].x + i;
-										index_y = spiral_entry[spiral_entry.size() - 1].y + j;
-										goon = true;
-									}
-								}
-								else
-								{
-									if (abs(p.distance - toolpath_size / 2.0) < 0.0001)
-									{
-										perfect_index.push_back(PixelIndex(spiral_entry[spiral_entry.size() - 1].x + i, spiral_entry[spiral_entry.size() - 1].y + j));
-									}
-
-									all_index.push_back(PixelIndex(i, j));
-									all_index_error.push_back(abs(p.distance - toolpath_size / 2.0));
-									all_index_distance.push_back(p.distance);
-									all_pixels.push_back(p);
-
-									if (abs(p.distance - toolpath_size / 2.0) < min_d)
-									{
-										min_d = abs(p.distance - toolpath_size / 2.0);
-										index_x = spiral_entry[spiral_entry.size() - 1].x + i;
-										index_y = spiral_entry[spiral_entry.size() - 1].y + j;
-										goon = true;
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-
-
-			if (!goon_check)
-			{
-				goon = false;
-			}
-			
-			if (goon)
-			{
-				if (perfect_index.size() > 1)
-				{
-					int spiral_index_min = (int)MAXDOUBLE;
-					int spiral_index;
-					for (int i = 0; i < perfect_index.size(); i++)
-					{
-						if (image_space.pixels[perfect_index[i].x][perfect_index[i].y].related_boundary_index_exit >= image_space.pixels[spiral_entry[spiral_entry.size() - 1].x][spiral_entry[spiral_entry.size() - 1].y].related_boundary_index_exit)
-						{
-							if (spiral_index_min > image_space.pixels[perfect_index[i].x][perfect_index[i].y].related_boundary_index_exit)
-							{
-								spiral_index_min = image_space.pixels[perfect_index[i].x][perfect_index[i].y].related_boundary_index_exit;
-								spiral_index = i;
-							}
-						}
-					}
-
-					index_x = perfect_index[spiral_index].x;
-					index_y = perfect_index[spiral_index].y;
-					goon = true;
-				}
-				else
-				{
-					int index_x_x = index_x;
-					int index_y_y = index_y;
-
-					if (spiral_entry.size() >= 2)
-					{
-
-						double max_distance_temp = image_space.PixelsDistance(index_x, index_y, spiral_entry[spiral_entry.size() - 2].x, spiral_entry[spiral_entry.size() - 2].y);
-
-						for (int i = 0; i < all_index_error.size(); i++)
-						{
-							if (!(all_index[i].x == (index_x - spiral_entry[spiral_entry.size() - 1].x) && all_index[i].y == (index_y - spiral_entry[spiral_entry.size() - 1].y)))
-							{
-								if (abs(all_index_error[i] - min_d) < 0.0001)
-								{
-									double distance_temp = image_space.PixelsDistance(spiral_entry[spiral_entry.size() - 1].x + all_index[i].x, spiral_entry[spiral_entry.size() - 1].y + all_index[i].y, spiral_entry[spiral_entry.size() - 2].x, spiral_entry[spiral_entry.size() - 2].y);
-
-									if (image_space.pixels[index_x_x][index_y_y].related_boundary_index_exit == image_space.pixels[spiral_entry[spiral_entry.size() - 1].x + all_index[i].x][spiral_entry[spiral_entry.size() - 1].y + all_index[i].y].related_boundary_index_exit)
-									{
-										if (max_distance_temp < distance_temp)
-										{
-											max_distance_temp = distance_temp;
-
-											index_x_x = spiral_entry[spiral_entry.size() - 1].x + all_index[i].x;
-											index_y_y = spiral_entry[spiral_entry.size() - 1].y + all_index[i].y;
-										}
-									}
-									else
-									{
-										if (image_space.pixels[index_x_x][index_y_y].related_boundary_index_exit<image_space.pixels[spiral_entry[spiral_entry.size() - 1].x + all_index[i].x][spiral_entry[spiral_entry.size() - 1].y + all_index[i].y].related_boundary_index_exit)
-										{
-											max_distance_temp = distance_temp;
-											index_x_x = spiral_entry[spiral_entry.size() - 1].x + all_index[i].x;
-											index_y_y = spiral_entry[spiral_entry.size() - 1].y + all_index[i].y;
-										}
-									}
-								}
-							}
-						}
-					}
-
-					index_x = index_x_x;
-					index_y = index_y_y;
-				}
-			}
-
-			if (goon&&!first_two_step_bool)
-			{
-				for (int x = index_x - toolpath_size / image_space.pixel_size; x <= index_x + toolpath_size / image_space.pixel_size; x++)
-				{
-					for (int y = index_y - toolpath_size / image_space.pixel_size; y <= index_y + toolpath_size / image_space.pixel_size; y++)
-					{
-						if (image_space.check(x, y) && image_space.PixelsDistance(index_x, index_y, x, y) < toolpath_size / 2.0&&goon)
-						{
-							if (image_space.pixels[x][y].filled&&!image_space.pixels[x][y].filled_entry_exit)
-							{
-								goon = false;
-								break;
-							}
-						}
-					}
-				}
-			}
-
-			for (int i = 0; i < all_index.size(); i++)
-			{
-				if (!(index_x == spiral_entry[spiral_entry.size() - 1].x + all_index[i].x&&
-					index_y == spiral_entry[spiral_entry.size() - 1].y + all_index[i].y))
-				{
-					image_space.pixels[spiral_entry[spiral_entry.size() - 1].x + all_index[i].x][spiral_entry[spiral_entry.size() - 1].y + all_index[i].y].failure_nb++;
-				}
-			}
-
-			std::vector<PixelIndex>().swap(perfect_index);
-			std::vector<PixelIndex>().swap(all_index);
-			std::vector<double>().swap(all_index_error);
-			std::vector<double>().swap(all_index_distance);
-			std::vector<Pixel>().swap(all_pixels);
-			if (goon)
-			{
-				InsertPixeltoSpiralEntry(PixelIndex(index_x, index_y));
-			}
-			else
-			{
-				std::cout << "Over..." << std::endl;
-				break;
-			}
-
-			if (!b)
-			{
-				break;
-			}
-
-		} while (goon);
-	}
-
-	void ToolpathGenerator::ChooseEntryExitPoints()
-	{
-		image_space.Reset();
-		image_space.CheckBoundary();
-		image_space.UpdateDistanceFromBoundary();
-
-		GetOnePointFromOffset(0.2, entry_point_x, entry_point_y);
-		GetOnePointFromOffset(0.8, exit_point_x, exit_point_y);
-
-		SearchUnfilledRegionBoundary(image_space.pixels[entry_point_x][entry_point_y].related_boundary_x, image_space.pixels[entry_point_x][entry_point_y].related_boundary_y);
-
-		InsertPixeltoSpiralEntry(PixelIndex(entry_point_x, entry_point_y));
-		InsertPixeltoSpiralExit(PixelIndex(exit_point_x, exit_point_y));
-
-		SearchOneStepforSpiralEntry(true);
-		SearchOneStepforSpiralExit(true);
-
-		first_two_step_bool = true;
-
-		for (int i = 0; i < 8; i++)
-		{
-		SearchOneStepforSpiralEntry(true);
-		SearchOneStepforSpiralExit(true);
 		}
-		for (int i = 0; i < input_int_2; i++)
-			SearchOneStepforSpiralEntry(false);
-		return;
 
-		do
-		{
-			std::cerr << "Whole iter: " << entry_number << std::endl;
+		Vector2d v=GetOnePointFromOffset(d,contour);
+		std::vector<Vector2d>().swap(contour);
+		return v;
 
-			entry_number++;
-
-			int spiral_entry_nb = spiral_entry.size(); 
-			int spiral_exit_nb = spiral_exit.size();
-			SearchOneStepforSpiralEntry(true);
-			SearchOneStepforSpiralExit(true);
-
-			if (spiral_entry_nb == spiral_entry.size() && spiral_exit_nb == spiral_exit.size())
-			break;
-
-		} while (true);
-
-		std::vector<PixelIndex> insertpixels;
-		ConnectTwoPixels(spiral_entry[spiral_entry.size() - 1], spiral_exit[spiral_exit.size() - 1], insertpixels);
-		
-		for (int i = 0; i < insertpixels.size(); i++)
-		{
-			spiral_entry.push_back(insertpixels[i]);
-		}
 	}
 
 }
-
-
-
-

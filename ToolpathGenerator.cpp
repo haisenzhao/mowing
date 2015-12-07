@@ -12,9 +12,7 @@
 
 namespace hpcg {
 
-
 	ToolpathGenerator::ToolpathGenerator(){
-
 	}
 
 	int iiiiii = 0;
@@ -22,7 +20,6 @@ namespace hpcg {
 	{
 		iiiiii++;
 	}
-
 
 	void ToolpathGenerator::Init(TMeshProcessor* render)
 	{
@@ -34,11 +31,10 @@ namespace hpcg {
 		draw_pixels = true;
 		draw_aixs =false;
 		draw_contour = true;
-		draw_offset = false;
+		draw_offset = true;
 		draw_spiral = false;
 
 		linewidth = 5;
-
 
 		entry_d_0 = 0.8;
 		exit_d_0 = 0.2;
@@ -62,21 +58,16 @@ namespace hpcg {
 		m_render = render;
 		LoadContour();
 		
-		OffsetBasedFermatSpiral1();
+		CreateDelaunayGraphs();
+
+		//GenerateFermatSpiral();
 
 		//ArchinedeanSpiral();
 
-		//Zigzag();
+		//GenerateZigzag();
+
+		//OutputPath(entry_spiral, "D:\\123.dat");
 		
-		/*
-		iss = CGAL::create_interior_straight_skeleton_2(contours);
-
-		std::cout << "Straight skeleton with " << iss->size_of_vertices()
-			<< " vertices, " << iss->size_of_halfedges()
-			<< " halfedges and " << iss->size_of_faces()
-			<< " faces" << std::endl;
-
-		*/
 	}
 	
 	void ToolpathGenerator::LoadContour()
@@ -156,21 +147,10 @@ namespace hpcg {
 				y += 0.1;
 				one_contour.push_back(Point_2(x, y));
 			}
-
 			contours.add_hole(one_contour);
 		}
 	}
-
-	void ToolpathGenerator::DrawPixel(int i, int j)
-	{
-		if (image_space.check(i, j))
-		{
-			glVertex3f(image_space.pixels[i][j].center[0] - image_space.pixel_size / 2.0, image_space.pixels[i][j].center[1] - image_space.pixel_size / 2.0, 0.0);
-			glVertex3f(image_space.pixels[i][j].center[0] - image_space.pixel_size / 2.0, image_space.pixels[i][j].center[1] + image_space.pixel_size / 2.0, 0.0);
-			glVertex3f(image_space.pixels[i][j].center[0] + image_space.pixel_size / 2.0, image_space.pixels[i][j].center[1] + image_space.pixel_size / 2.0, 0.0);
-			glVertex3f(image_space.pixels[i][j].center[0] + image_space.pixel_size / 2.0, image_space.pixels[i][j].center[1] - image_space.pixel_size / 2.0, 0.0);
-		}
-	}
+	
 	void ToolpathGenerator::Rendering()
 	{
 	    //draw pixels
@@ -308,10 +288,18 @@ namespace hpcg {
 			glEnd();
 		}
 
-		if (false)
+		for (int i = 0; i < mats.size(); i = i + 2)
+		{
+			glLineWidth(5);
+			glColor3f(1.0, 0.0, 0.0);
+			glBegin(GL_LINE_STRIP);
+			glVertex3f(mats[i][0], mats[i][1], 0.0);
+			glVertex3f(mats[(i + 1) % mats.size()][0], mats[(i + 1) % mats.size()][1], 0.0);
+			glEnd();
+		}
+
 		if (draw_offset)
 		{
-
 			glPointSize(linewidth*2.0);
 			glColor3f(2 / 255.0, 126 / 255.0, 18.0 / 255.0);
 			glBegin(GL_POINTS);
@@ -322,7 +310,7 @@ namespace hpcg {
 			glEnd();
 
 			glPointSize(linewidth * 2.0);
-			glColor3f(255.0 / 255.0, 42.0 / 255.0, 26.0 / 255.0);
+			glColor3f(255.0 / 255.0, 255.0 / 255.0, 26.0 / 255.0);
 			glBegin(GL_POINTS);
 			for (int i = 0; i < cccc.size(); i++)
 			{
@@ -330,62 +318,9 @@ namespace hpcg {
 			}
 			glEnd();
 		}
-
-		/*
-		Halfedge_const_handle null_halfedge;
-		Vertex_const_handle   null_vertex;
-		for (Halfedge_const_iterator i = iss->halfedges_begin(); i != iss->halfedges_end(); ++i)
-		{
-
-			if (i->is_inner_bisector())
-			{
-				glLineWidth(5);
-				glColor3f(1.0, 0.0, 0.0);
-				glBegin(GL_LINE_STRIP);
-
-				glVertex3f(i->opposite()->vertex()->point().x(), i->opposite()->vertex()->point().y(), 0.0);
-				glVertex3f(i->vertex()->point().x(), i->vertex()->point().y(), 0.0);
-
-				glEnd();
-			}
-			else
-			{
-				glLineWidth(5);
-				glColor3f(0.0, 0.0, 1.0);
-				glBegin(GL_LINE_STRIP);
-
-				
-				glVertex3f(i->opposite()->vertex()->point().x(), i->opposite()->vertex()->point().y(), 0.0);
-				glVertex3f(i->vertex()->point().x(), i->vertex()->point().y(), 0.0);
-
-				glEnd();
-			}
-		}
-		*/
 	}
 
-	void ToolpathGenerator::ComputeOffsets()
-	{
-		double lOffset = toolpath_size/2.0;
-		PolygonPtrVector offset_polygons = CGAL::create_interior_skeleton_and_offset_polygons_2(lOffset, contours);
-		while (offset_polygons.size()>0)
-		{
-			for (PolygonPtrVector::const_iterator pi = offset_polygons.begin(); pi != offset_polygons.end(); ++pi)
-			{
-				std::vector<Vector2d> one_path;
-				for (Polygon_2::Vertex_const_iterator vi = (**pi).vertices_begin(); vi != (**pi).vertices_end(); ++vi)
-				{
-					one_path.push_back(Vector2d((*vi).x(), (*vi).y()));
-				}
-
-				offsets.push_back(one_path);
-			}
-
-			lOffset = lOffset + toolpath_size;
-			offset_polygons = CGAL::create_interior_skeleton_and_offset_polygons_2(lOffset, contours);
-		}
-	}
-
+	
 
 
 }

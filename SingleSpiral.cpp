@@ -20,10 +20,10 @@ namespace hpcg {
 			SelectOnePartOffset(i, entry_d_0, entry_d_1, entry_spiral);
 
 			if (i != offsets.size() - 1)
-				entry_d_0 = FindNearestPoint(i + 1, entry_spiral[entry_spiral.size() - 1]);
+				entry_d_0 = FindNearestPointPar(entry_spiral[entry_spiral.size() - 1], i + 1);
 		}
-	
 	}
+
 
 	void ToolpathGenerator::PolygonSmoothing()
 	{

@@ -54,7 +54,19 @@ namespace hpcg {
 			image_space.pixels.push_back(pixels);
 			std::vector<Pixel>().swap(pixels);
 		}
-	
+	}
+
+
+
+	void ToolpathGenerator::DrawPixel(int i, int j)
+	{
+		if (image_space.check(i, j))
+		{
+			glVertex3f(image_space.pixels[i][j].center[0] - image_space.pixel_size / 2.0, image_space.pixels[i][j].center[1] - image_space.pixel_size / 2.0, 0.0);
+			glVertex3f(image_space.pixels[i][j].center[0] - image_space.pixel_size / 2.0, image_space.pixels[i][j].center[1] + image_space.pixel_size / 2.0, 0.0);
+			glVertex3f(image_space.pixels[i][j].center[0] + image_space.pixel_size / 2.0, image_space.pixels[i][j].center[1] + image_space.pixel_size / 2.0, 0.0);
+			glVertex3f(image_space.pixels[i][j].center[0] + image_space.pixel_size / 2.0, image_space.pixels[i][j].center[1] - image_space.pixel_size / 2.0, 0.0);
+		}
 	}
 
 }

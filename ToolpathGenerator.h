@@ -5,6 +5,10 @@
 #include "OpenMeshHelper.h"
 #include "MyMesh.h"
 
+#include <iostream>
+#include <fstream>
+#include <cassert>
+
 #include<boost/shared_ptr.hpp>
 #include<CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include<CGAL/Polygon_with_holes_2.h>
@@ -18,6 +22,14 @@
 #include <CGAL/intersections.h>
 #include<CGAL/create_straight_skeleton_from_polygon_with_holes_2.h>
 
+
+#include <CGAL/Simple_cartesian.h>
+#include <CGAL/Segment_Delaunay_graph_2.h>
+#include <CGAL/Segment_Delaunay_graph_filtered_traits_2.h>
+
+typedef CGAL::Simple_cartesian<double> KC;
+typedef CGAL::Segment_Delaunay_graph_filtered_traits_without_intersections_2<KC> Gt;
+typedef CGAL::Segment_Delaunay_graph_2<Gt>  SDG2;
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
 typedef K::Point_2                    Point_2;
@@ -35,7 +47,6 @@ typedef CGAL::Straight_skeleton_2<K>  Ss;
 typedef boost::shared_ptr<Polygon_2> PolygonPtr;
 typedef boost::shared_ptr<Ss> SsPtr;
 typedef std::vector<PolygonPtr> PolygonPtrVector;
-
 
 
 #define MAXDOUBLE 1000000000.0;
@@ -86,6 +97,11 @@ namespace hpcg {
 		}
 	};
 
+	struct MedialAxis
+	{
+		//std::vector<Vector2d> 
+	};
+
 	class ToolpathGenerator
 	{
 	protected:
@@ -109,7 +125,7 @@ namespace hpcg {
 		bool draw_offset;
 		bool draw_spiral;
 
-		SsPtr iss;
+		SDG2 sdg;
 
 		std::vector<Vector2d> entry_spiral;
 		std::vector<Vector2d> exit_spiral;
@@ -118,6 +134,7 @@ namespace hpcg {
 		double entry_d_0;
 		double exit_d_0;
 
+		std::vector<Vector2d> mats;
 
 		ToolpathGenerator();
 		void Init(TMeshProcessor* render);
@@ -132,18 +149,20 @@ namespace hpcg {
 		void Rendering();
 
 		//offset fermat spiral
-		void OffsetBasedFermatSpiral1();
+		void GenerateFermatSpiral();
+		void GenerateZigzag();
+		void ArchinedeanSpiral();
 
-		double FindNearestPoint(int offset_index, Vector2d v);
-		double FindNearestPoint(Vector2d v, std::vector<Vector2d> &contour);
-		
+		double FindNearestPointPar(Vector2d v, int offset_index);
+		double FindNearestPointPar(Vector2d v, std::vector<Vector2d> &contour);
+
 		double DeltaDGeodesicDistance(double d, double distance, std::vector<Vector2d> &contour);
 		double DeltaDEuclideanDistance(double d, double distance, std::vector<Vector2d> &contour);
 		double DeltaDEuclideanDistance(double d, double distance, int offset_index);
 		double ComputeNextTurningPoint(double d, double distance, int offset_index);
 
-		void GetOnePointFromOffset(int offset_index, double d, Vector2d &v);
-		void GetOnePointFromOffset(std::vector<Vector2d> &contour, double d, Vector2d &v);
+		Vector2d GetOnePointFromOffset(double d, int offset_index);
+		Vector2d GetOnePointFromOffset(double d,std::vector<Vector2d> &contour);
 		
 		void SelectOnePartOffset(int offset_index, double d0, double d1, std::vector<Vector2d> &vecs);
 		void SelectOnePartOffset(std::vector<Vector2d> &contour, double d0, double d1, std::vector<Vector2d> &vecs);
@@ -152,16 +171,21 @@ namespace hpcg {
 		void GenerateOffset(bool direction, int offset_index, double lOffset, std::vector<Vector2d> &offset);
 
 		double MinimalDistance(std::vector<Vector2d> &vecs, Vector2d &v);
+		double MinimalDistanceSegments(std::vector<Vector2d> &segments, Vector2d &v);
 
-		void CreateMAT();
+		double MinimalDistanceContours(Vector2d &v);
 
-		void Zigzag();
-
-		void ArchinedeanSpiral();
+		void CreateDelaunayGraphs();
 
 		void PolygonSmoothing();
 
-		void OutputPath();
+		void OutputPath(std::vector<Vector2d> &vecs, std::string path);
+
+		bool CheckInsideContours(Vector2d &v);
+
+		bool CheckOnContours(Vector2d &v);
+
+		void RelatedPointsOnContours(Vector2d &v, double distace, std::vector<Vector2d> &vecs);
 
 	};
 } 

@@ -4,20 +4,31 @@
 
 
 namespace hpcg {
-	
 
-	void ToolpathGenerator::OutputPath()
+
+	void ToolpathGenerator::OutputPath(std::vector<Vector2d> &vecs, std::string path)
 	{
+		std::ofstream file(path);
+
+		if (file.is_open())
+		{
+			for (int i = 0; i < vecs.size(); i++)
+			{
+				file << vecs[i][0] << " " << vecs[i][1] << std::endl;
+			}
+		}
+		file.clear();
+		file.close();
 
 	}
 
-	void ToolpathGenerator::Zigzag()
+	void ToolpathGenerator::GenerateZigzag()
 	{
-		for (int i = 0; i < 4;i++)
-		PolygonSmoothing();
+		for (int i = 0; i < 4; i++)
+			PolygonSmoothing();
 
 		std::vector<Vector2d> offset;
-		GenerateOffset(false, -1, toolpath_size/2.0, offset);
+		GenerateOffset(false, -1, toolpath_size / 2.0, offset);
 
 		int i = 0;
 
