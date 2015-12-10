@@ -22,12 +22,10 @@ namespace hpcg {
 
 				offsets.push_back(one_path);
 			}
-
 			lOffset = lOffset + toolpath_size;
 			offset_polygons = CGAL::create_interior_skeleton_and_offset_polygons_2(lOffset, contours);
 		}
 	}
-
 
 	bool CompareTwoDouble(double d0, double d1, double d)
 	{
@@ -47,16 +45,14 @@ namespace hpcg {
 		}
 	}
 
-	void ToolpathGenerator::GenerateFermedial_axis_pointspiral()
+	void ToolpathGenerator::FermatSpiral()
 	{
-		
 		ComputeOffsets();
-		//BuildeImageSpace();
 
 		bool b0 = false;
 
 		std::vector<Vector2d> offset;
-		GenerateOffset(false, offsets.size() - 1, toolpath_size / 2, offset);
+		GenerateOffset(offsets.size() - 1, toolpath_size / 2, offset);
 		if (offset.size() == 0)
 			b0=true;
 		std::vector<Vector2d>().swap(offset);
@@ -198,10 +194,10 @@ namespace hpcg {
 
 			if (i % 2 == 0)
 			{
-				cccc.push_back(entry_p_0);
-				dddd.push_back(entry_p_1);
-				dddd.push_back(exit_p_0);
-				cccc.push_back(exit_p_1);
+				turning_points_entry.push_back(entry_p_0);
+				turning_points_exit.push_back(entry_p_1);
+				turning_points_exit.push_back(exit_p_0);
+				turning_points_entry.push_back(exit_p_1);
 
 				if (i == offsets.size() - 1)
 				{
@@ -259,10 +255,10 @@ namespace hpcg {
 			}
 			else
 			{
-				dddd.push_back(entry_p_0);
-				cccc.push_back(entry_p_1);
-				cccc.push_back(exit_p_0);
-				dddd.push_back(exit_p_1);
+				turning_points_exit.push_back(entry_p_0);
+				turning_points_entry.push_back(entry_p_1);
+				turning_points_entry.push_back(exit_p_0);
+				turning_points_exit.push_back(exit_p_1);
 
 				if (i == offsets.size() - 1)
 				{
@@ -359,6 +355,8 @@ namespace hpcg {
 		*/
 	}
 
+
+
 	double ToolpathGenerator::MinimalDistanceSegments(std::vector<Vector2d> &segments, Vector2d &v)
 	{
 		double m_d = MAXDOUBLE;
@@ -387,7 +385,7 @@ namespace hpcg {
 
 	}
 	
-	void ToolpathGenerator::GenerateOffset(bool direction, int offset_index, double lOffset, std::vector<Vector2d> &offset)
+	void ToolpathGenerator::GenerateOffset(int offset_index, double lOffset, std::vector<Vector2d> &offset)
 	{
 		std::vector<Vector2d> contour;
 
@@ -413,11 +411,11 @@ namespace hpcg {
 			}
 		}
 
-		GenerateOffset(direction, contour, lOffset, offset);
+		GenerateOffset(contour, lOffset, offset);
 
 		std::vector<Vector2d>().swap(contour);
 	}
-	void ToolpathGenerator::GenerateOffset(bool direction, std::vector<Vector2d> &contour, double lOffset, std::vector<Vector2d> &offset)
+	void ToolpathGenerator::GenerateOffset(std::vector<Vector2d> &contour, double lOffset, std::vector<Vector2d> &offset)
 	{
 		Polygon_2 polygon;
 

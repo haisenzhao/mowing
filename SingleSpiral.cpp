@@ -24,10 +24,8 @@ namespace hpcg {
 		}
 	}
 
-
 	void ToolpathGenerator::PolygonSmoothing()
 	{
-
 		std::vector<Vector2d> contour;
 
 		for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)

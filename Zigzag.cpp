@@ -21,14 +21,13 @@ namespace hpcg {
 		file.close();
 	}
 
-
 	void ToolpathGenerator::GenerateZigzag()
 	{
 		for (int i = 0; i < 4; i++)
 			PolygonSmoothing();
 
 		std::vector<Vector2d> offset;
-		GenerateOffset(false, -1, toolpath_size / 2.0, offset);
+		GenerateOffset(-1, toolpath_size / 2.0, offset);
 
 		int i = 0;
 

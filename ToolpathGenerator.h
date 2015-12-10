@@ -118,23 +118,33 @@ namespace hpcg {
 
 	public:
 		
-		bool draw_boundary;
 		bool draw_pixels;
 		bool draw_aixs;
 		bool draw_contour;
-		bool draw_offset;
+		bool draw_offsets;
 		bool draw_spiral;
+		bool draw_turning_points;
 		bool draw_voronoi;
 		bool draw_medial_axis;
+		bool draw_minimal_points;
+		bool draw_entry_exit_spiral;
+		bool draw_entry_exit_points;
+		bool draw_polygons_entry_exit;
+		bool draw_cutting_points;
+
 
 		SDG2 sdg;
 
 		std::vector<Vector2d> entry_spiral;
 		std::vector<Vector2d> exit_spiral;
-		std::vector<Vector2d> cccc;
-		std::vector<Vector2d> dddd;
+		std::vector<Vector2d> turning_points_entry;
+		std::vector<Vector2d> turning_points_exit;
 		double entry_d_0;
 		double exit_d_0;
+
+		std::vector<Vector2d> minimal_points;
+		std::vector<Vector2d> cutting_points;
+
 
 		std::vector<Vector2d> medial_axis_points;
 		std::vector<Vector2d> voronoi_edge_points;
@@ -162,7 +172,7 @@ namespace hpcg {
 		void Rendering();
 
 		//offset fermat spiral
-		void GenerateFermedial_axis_pointspiral();
+		void FermatSpiral();
 		void GenerateZigzag();
 		void ArchinedeanSpiral();
 
@@ -180,36 +190,32 @@ namespace hpcg {
 		void SelectOnePartOffset(int offset_index, double d0, double d1, std::vector<Vector2d> &vecs);
 		void SelectOnePartOffset(std::vector<Vector2d> &contour, double d0, double d1, std::vector<Vector2d> &vecs);
 		
-		void GenerateOffset(bool direction, std::vector<Vector2d> &contour, double lOffset, std::vector<Vector2d> &offset);
-		void GenerateOffset(bool direction, int offset_index, double lOffset, std::vector<Vector2d> &offset);
+		void GenerateOffset(std::vector<Vector2d> &contour, double lOffset, std::vector<Vector2d> &offset);
+		void GenerateOffset(int offset_index, double lOffset, std::vector<Vector2d> &offset);
 
 		double MinimalDistance(std::vector<Vector2d> &vecs, Vector2d &v);
 		double MinimalDistanceSegments(std::vector<Vector2d> &segments, Vector2d &v);
 
 		double MinimalDistanceContours(Vector2d &v);
 
-		void CompuateCutPoints();
+		
+		void PolygonSmoothing();
+		void OutputPath(std::vector<Vector2d> &vecs, std::string path);
+
+		//filling algorithm
+		void FillingAlgorithm();
+		void RegionDecomposition();
+		void ToolpathGeneration();
 
 		void GenerateRegionMedialAxisPoints();
 		void GenerateVoronoiEdgePoints();
 
-		void PolygonSmoothing();
-
-		void OutputPath(std::vector<Vector2d> &vecs, std::string path);
-
 		bool CheckInsideContours(Vector2d &v);
-
 		bool CheckOnContours(Vector2d &v);
-
-		void RelatedPointsOnContours(Vector2d &v, double distace, std::vector<Vector2d> &vecs);
-
-		void DecomposePolygons(std::vector<Vector2d> &cut_points, std::vector<Vector2d> &contour, std::vector<std::vector<Vector2d>> &polygons);
-
+		void ComputeCuttingPoints(Vector2d &v, double distace, std::vector<Vector2d> &vecs);
+		void DecomposeSubregions(std::vector<Vector2d> &cut_points, std::vector<Vector2d> &contour, std::vector<std::vector<Vector2d>> &polygons);
 		Vector2d ComputeEntryExitPoint(std::vector<Vector2d> &contour, Vector2d &v);
-
 		void GenerateOffsetsForAllPolygons();
-
-
 
 	};
 } 
