@@ -15,7 +15,7 @@ namespace hpcg {
 	ToolpathGenerator::ToolpathGenerator(){
 	}
 
-	int iiiiii = 0;
+	int iiiiii = -1;
 	void  ToolpathGenerator::StepDebug()
 	{
 		iiiiii++;
@@ -33,6 +33,8 @@ namespace hpcg {
 		draw_contour = true;
 		draw_offset = true;
 		draw_spiral = false;
+		draw_voronoi = false;
+		draw_medial_axis = false;
 
 		linewidth = 5;
 
@@ -58,14 +60,13 @@ namespace hpcg {
 		m_render = render;
 		LoadContour();
 		
-		CreateDelaunayGraphs();
+		CompuateCutPoints();
 
-		//GenerateFermatSpiral();
+		//ComputeOffsets();
 
+		//GenerateFermedial_axis_pointspiral();
 		//ArchinedeanSpiral();
-
 		//GenerateZigzag();
-
 		//OutputPath(entry_spiral, "D:\\123.dat");
 		
 	}
@@ -240,7 +241,7 @@ namespace hpcg {
 			glLineWidth(linewidth);
 			glColor3f(255.0/255.0, 42.0/255.0, 26.0/255.0);
 			glBegin(GL_LINE_STRIP);
-			for (int i = 0; i < entry_spiral.size() - iiiiii; i++)
+			for (int i = 0; i < entry_spiral.size(); i++)
 			{
 				glVertex3f(entry_spiral[i][0], entry_spiral[i][1], 0.0);
 			}
@@ -288,36 +289,125 @@ namespace hpcg {
 			glEnd();
 		}
 
-		for (int i = 0; i < mats.size(); i = i + 2)
+		if (draw_voronoi)
 		{
-			glLineWidth(5);
-			glColor3f(1.0, 0.0, 0.0);
-			glBegin(GL_LINE_STRIP);
-			glVertex3f(mats[i][0], mats[i][1], 0.0);
-			glVertex3f(mats[(i + 1) % mats.size()][0], mats[(i + 1) % mats.size()][1], 0.0);
-			glEnd();
+			for (int i = 0; i < voronoi_edge_points.size(); i = i + 2)
+			{
+				glLineWidth(2);
+				glColor3f(0.5, 0.5, 0.0);
+				glBegin(GL_LINE_STRIP);
+				glVertex3f(voronoi_edge_points[i][0], voronoi_edge_points[i][1], 0.0);
+				glVertex3f(voronoi_edge_points[(i + 1) % voronoi_edge_points.size()][0], voronoi_edge_points[(i + 1) % voronoi_edge_points.size()][1], 0.0);
+				glEnd();
+			}
+
+		}
+
+		if (draw_medial_axis)
+		{
+			for (int i = 0; i < medial_axis_points.size(); i = i + 2)
+			{
+				glLineWidth(2*2);
+				glColor3f(0.4, 0.4, 0.0);
+				glBegin(GL_LINE_STRIP);
+				glVertex3f(medial_axis_points[i][0], medial_axis_points[i][1], 0.0);
+				glVertex3f(medial_axis_points[(i + 1) % medial_axis_points.size()][0], medial_axis_points[(i + 1) % medial_axis_points.size()][1], 0.0);
+				glEnd();
+			}
+			if (false)
+			for (int i = 0; i < medial_axis_points.size(); i = i + 2)
+			{
+				glPointSize(2 * 2+2);
+				glColor3f(1.0, 0.0, 0.0);
+				glBegin(GL_POINTS);
+				glVertex3f(medial_axis_points[i][0], medial_axis_points[i][1], 0.0);
+				glVertex3f(medial_axis_points[(i + 1) % medial_axis_points.size()][0], medial_axis_points[(i + 1) % medial_axis_points.size()][1], 0.0);
+				glEnd();
+			}
 		}
 
 		if (draw_offset)
 		{
-			glPointSize(linewidth*2.0);
-			glColor3f(2 / 255.0, 126 / 255.0, 18.0 / 255.0);
-			glBegin(GL_POINTS);
-			for (int i = 0; i < dddd.size(); i++)
+			if (true)
+			for (int i = 0; i < dddd.size(); i = i + 2)
 			{
+				glPointSize(linewidth*2.0);
+				glColor3f(2 / 255.0, 126 / 255.0, 18.0 / 255.0);
+				glBegin(GL_LINE_STRIP);
 				glVertex3f(dddd[i][0], dddd[i][1], 0.0);
+				glVertex3f(dddd[i + 1][0], dddd[i + 1][1], 0.0);
+				glEnd();
 			}
-			glEnd();
 
-			glPointSize(linewidth * 2.0);
-			glColor3f(255.0 / 255.0, 255.0 / 255.0, 26.0 / 255.0);
-			glBegin(GL_POINTS);
-			for (int i = 0; i < cccc.size(); i++)
+			if (true)
 			{
-				glVertex3f(cccc[i][0], cccc[i][1], 0.0);
+				glPointSize(linewidth*2.0+4);
+				glColor3f(2 / 255.0, 126 / 255.0, 18.0 / 255.0);
+				glBegin(GL_POINTS);
+				for (int i = 0; i < dddd.size(); i++)
+				{
+					glVertex3f(dddd[i][0], dddd[i][1], 0.0);
+				}
+				glEnd();
 			}
+
+
+			if (false)
+			{
+				glPointSize(linewidth * 2.0);
+				glColor3f(255.0 / 255.0, 255.0 / 255.0, 26.0 / 255.0);
+				glBegin(GL_POINTS);
+				for (int i = 0; i < cccc.size(); i++)
+				{
+					glVertex3f(cccc[i][0], cccc[i][1], 0.0);
+				}
+				glEnd();
+			}
+
+	
+		}
+
+		for (int i = 0; i < polygons_entry_exit.size(); i++)
+		{
+			glPointSize(linewidth * 2.0);
+			glColor3f(1.0, 0.0, 0.0);
+			glBegin(GL_POINTS);
+
+			glVertex3f(polygons_entry_exit[i][0][0], polygons_entry_exit[i][0][1], 0.0);
+			glVertex3f(polygons_entry_exit[i][1][0], polygons_entry_exit[i][1][1], 0.0);
+
 			glEnd();
 		}
+
+		if (false)
+		if (iiiiii >= 0 && iiiiii < polygons.size())
+		{
+			for (int i = 0; i < polygons[iiiiii].size(); i++)
+			{
+				glPointSize(linewidth*2.0);
+				glColor3f(1.0, 0.0, 0.0);
+				glBegin(GL_LINE_STRIP);
+
+				glVertex3f(polygons[iiiiii][i][0], polygons[iiiiii][i][1], 0.0);
+				glVertex3f(polygons[iiiiii][(i + 1) % polygons[iiiiii].size()][0], polygons[iiiiii][(i + 1) % polygons[iiiiii].size()][1], 0.0);
+
+				glEnd();
+			}
+		}
+		
+
+		/*
+		for (int i = 0; i < connected_graph.size(); i = i + 2)
+		{
+			glPointSize(linewidth*2.0);
+			glColor3f(2 / 255.0, 126 / 255.0, 18.0 / 255.0);
+			glBegin(GL_LINE_STRIP);
+			glVertex3f(connected_graph_point[connected_graph[i]][0], connected_graph_point[connected_graph[i]][1], 0.0);
+			glVertex3f(connected_graph_point[connected_graph[i+1]][0], connected_graph_point[connected_graph[i+1]][1], 0.0);
+			glEnd();
+		}
+		*/
+
 	}
 
 	

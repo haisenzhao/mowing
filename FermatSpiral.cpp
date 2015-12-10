@@ -47,7 +47,7 @@ namespace hpcg {
 		}
 	}
 
-	void ToolpathGenerator::GenerateFermatSpiral()
+	void ToolpathGenerator::GenerateFermedial_axis_pointspiral()
 	{
 		
 		ComputeOffsets();
@@ -428,8 +428,10 @@ namespace hpcg {
 
 		if (polygon.is_simple())
 		{
-			if (direction)
+			if (polygon.is_clockwise_oriented())
+			{
 				polygon.reverse_orientation();
+			}
 
 			PolygonPtrVector offset_polygons = CGAL::create_interior_skeleton_and_offset_polygons_2(lOffset, polygon);
 
@@ -461,8 +463,9 @@ namespace hpcg {
 			{
 				total_length += sqrt((double)CGAL::squared_distance(Point_2(contour[i].x, contour[i].y), Point_2(contour[(i + 1) % contour.size()].x, contour[(i + 1) % contour.size()].y)));
 			}
+			
 			std::vector<double> vec_ds;
-
+			
 			vec_ds.push_back(0.0);
 			double length = 0.0;
 			for (int i = 0; i < contour.size(); i++)
@@ -481,7 +484,13 @@ namespace hpcg {
 					if (vec_ds[i]<d0&&vec_ds[i]>d1)
 					{
 						v = GetOnePointFromOffset(vec_ds[i],contour);
-						vecs.push_back(v);
+
+						if (!(abs(v[0] - vecs[vecs.size() - 1][0]) < 0.000001&&abs(v[1] - vecs[vecs.size() - 1][1]) < 0.000001))
+						{
+							vecs.push_back(v);
+						}
+
+					
 					}
 
 					if (vec_ds[i] < d1)
@@ -497,23 +506,32 @@ namespace hpcg {
 					if (vec_ds[i] < d0)
 					{
 						v = GetOnePointFromOffset(vec_ds[i],contour);
-						vecs.push_back(v);
+
+						if (!(abs(v[0] - vecs[vecs.size() - 1][0]) < 0.000001&&abs(v[1] - vecs[vecs.size() - 1][1]) < 0.000001))
+						{
+							vecs.push_back(v);
+						}
 					}
 				}
-
 
 				for (int i = vec_ds.size() - 1; i >0; i--)
 				{
 					if (vec_ds[i] > d1)
 					{
 						v = GetOnePointFromOffset(vec_ds[i],contour);
-						vecs.push_back(v);
+						if (!(abs(v[0] - vecs[vecs.size() - 1][0]) < 0.000001&&abs(v[1] - vecs[vecs.size() - 1][1]) < 0.000001))
+						{
+							vecs.push_back(v);
+						}
 					}
 				}
 			}
 
 			v=GetOnePointFromOffset(d1,contour);
-			vecs.push_back(v);
+			if (!(abs(v[0] - vecs[vecs.size() - 1][0]) < 0.000001&&abs(v[1] - vecs[vecs.size() - 1][1]) < 0.000001))
+			{
+				vecs.push_back(v);
+			}
 
 			std::vector<double>().swap(vec_ds);
 		}

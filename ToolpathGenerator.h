@@ -124,6 +124,8 @@ namespace hpcg {
 		bool draw_contour;
 		bool draw_offset;
 		bool draw_spiral;
+		bool draw_voronoi;
+		bool draw_medial_axis;
 
 		SDG2 sdg;
 
@@ -134,7 +136,18 @@ namespace hpcg {
 		double entry_d_0;
 		double exit_d_0;
 
-		std::vector<Vector2d> mats;
+		std::vector<Vector2d> medial_axis_points;
+		std::vector<Vector2d> voronoi_edge_points;
+
+		std::vector<std::vector<Vector2d>> polygons;
+		std::vector<std::vector<Vector2d>> polygons_entry_exit;
+		std::vector<int> connected_graph;
+		
+		std::vector<Vector2d> entry_exit_points;
+
+		std::vector<std::vector<int>> connected_graph_de;
+		std::vector<std::vector<int>> connected_graph_de_index;
+		std::vector<Vector2d> connected_graph_point;
 
 		ToolpathGenerator();
 		void Init(TMeshProcessor* render);
@@ -149,7 +162,7 @@ namespace hpcg {
 		void Rendering();
 
 		//offset fermat spiral
-		void GenerateFermatSpiral();
+		void GenerateFermedial_axis_pointspiral();
 		void GenerateZigzag();
 		void ArchinedeanSpiral();
 
@@ -175,7 +188,10 @@ namespace hpcg {
 
 		double MinimalDistanceContours(Vector2d &v);
 
-		void CreateDelaunayGraphs();
+		void CompuateCutPoints();
+
+		void GenerateRegionMedialAxisPoints();
+		void GenerateVoronoiEdgePoints();
 
 		void PolygonSmoothing();
 
@@ -186,6 +202,14 @@ namespace hpcg {
 		bool CheckOnContours(Vector2d &v);
 
 		void RelatedPointsOnContours(Vector2d &v, double distace, std::vector<Vector2d> &vecs);
+
+		void DecomposePolygons(std::vector<Vector2d> &cut_points, std::vector<Vector2d> &contour, std::vector<std::vector<Vector2d>> &polygons);
+
+		Vector2d ComputeEntryExitPoint(std::vector<Vector2d> &contour, Vector2d &v);
+
+		void GenerateOffsetsForAllPolygons();
+
+
 
 	};
 } 

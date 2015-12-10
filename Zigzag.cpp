@@ -19,8 +19,8 @@ namespace hpcg {
 		}
 		file.clear();
 		file.close();
-
 	}
+
 
 	void ToolpathGenerator::GenerateZigzag()
 	{
