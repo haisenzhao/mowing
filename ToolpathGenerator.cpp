@@ -30,16 +30,17 @@ namespace hpcg {
 		draw_pixels = false;
 		draw_aixs =false;
 		draw_contour = true;
-		draw_offsets = false;
+		draw_offsets = true;
 		draw_entry_exit_spiral = true;
-		draw_turning_points = true;
+		draw_turning_points = false;
 
 		draw_spiral = false;
 		draw_voronoi = false;
 		draw_medial_axis = false;
 		draw_minimal_points = false;
-		draw_entry_exit_points = true;
-		draw_cutting_points = true;
+		draw_entry_exit_points = false;
+		draw_cutting_points = false;
+		draw_polygons_entry_exit = false;
 
 		linewidth = 5;
 
@@ -66,14 +67,21 @@ namespace hpcg {
 		LoadContour();
 		
 		
-		FillingAlgorithm();
+		std::vector<Vector2d> contour;
 
+		for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
+		{
+			contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
+		}
+
+		//FillingAlgorithm();
 		//FermatSpiral();
 
-		//ArchinedeanSpiral();
+		ArchinedeanSpiral(contour);
 		//GenerateZigzag();
-		//OutputPath(entry_spiral, "D:\\123.dat");
+		OutputPath(entry_spiral, "D:\\123.dat");
 		
+		std::vector<Vector2d>().swap(contour);
 	}
 	
 	void ToolpathGenerator::LoadContour()

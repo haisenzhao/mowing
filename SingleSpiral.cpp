@@ -5,12 +5,19 @@
 
 namespace hpcg {
 
-	void ToolpathGenerator::ArchinedeanSpiral()
+	void ToolpathGenerator::ArchinedeanSpiral(std::vector<Vector2d> &contour)
 	{
 		for (int i = 0; i < 3; i++)
 			PolygonSmoothing();
 
-		ComputeOffsets();
+		std::vector<Vector2d> contour1;
+
+		for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
+		{
+			contour1.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
+		}
+
+		ComputeOffsets(contour1);
 
 		for (int i = 0; i < offsets.size(); i++)
 		{

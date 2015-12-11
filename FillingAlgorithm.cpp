@@ -13,6 +13,7 @@ namespace hpcg {
 
 		//Generate Fermat spiral for each sub-region
 		//GenerateOffsetsForAllPolygons();
+		FermatSpiral(polygons[0], polygons_entry_exit[0][0], polygons_entry_exit[0][1]);
 	}
 
 	void ToolpathGenerator::RegionDecomposition()

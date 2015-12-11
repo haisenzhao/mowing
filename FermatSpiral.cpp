@@ -5,25 +5,17 @@
 
 namespace hpcg {
 
-
-	void ToolpathGenerator::ComputeOffsets()
+	void ToolpathGenerator::ComputeOffsets(std::vector<Vector2d> &contour)
 	{
 		double lOffset = toolpath_size / 2.0;
-		PolygonPtrVector offset_polygons = CGAL::create_interior_skeleton_and_offset_polygons_2(lOffset, contours);
-		while (offset_polygons.size()>0)
+		std::vector<Vector2d> one_path;
+		GenerateOffset(contour, lOffset, one_path);
+		while (one_path.size() > 0)
 		{
-			for (PolygonPtrVector::const_iterator pi = offset_polygons.begin(); pi != offset_polygons.end(); ++pi)
-			{
-				std::vector<Vector2d> one_path;
-				for (Polygon_2::Vertex_const_iterator vi = (**pi).vertices_begin(); vi != (**pi).vertices_end(); ++vi)
-				{
-					one_path.push_back(Vector2d((*vi).x(), (*vi).y()));
-				}
-
-				offsets.push_back(one_path);
-			}
+			offsets.push_back(one_path);
+			std::vector<Vector2d>().swap(one_path);
 			lOffset = lOffset + toolpath_size;
-			offset_polygons = CGAL::create_interior_skeleton_and_offset_polygons_2(lOffset, contours);
+			GenerateOffset(contour, lOffset, one_path);
 		}
 	}
 
@@ -45,9 +37,15 @@ namespace hpcg {
 		}
 	}
 
-	void ToolpathGenerator::FermatSpiral()
+	void ToolpathGenerator::FermatSpiral(std::vector<Vector2d> &contour, Vector2d input_entry_point, Vector2d input_exit_point)
 	{
-		ComputeOffsets();
+		ComputeOffsets(contour);
+
+		entry_d_0 = FindNearestPointPar(input_entry_point, 0);
+		exit_d_0 = FindNearestPointPar(input_exit_point, 0);
+
+		//entry_d_0 = 0.36;
+	//	exit_d_0 = 0.73;
 
 		bool b0 = false;
 
@@ -59,9 +57,6 @@ namespace hpcg {
 
 		for (int i = 0; i < offsets.size(); i++)
 		{
-		    //double entry_d_1 = DeltaDEuclideanDistance(entry_d_0, toolpath_size, i);
-			//double exit_d_1 = DeltaDEuclideanDistance(exit_d_0, toolpath_size, i);
-
 			bool goon = true;
 
 			double entry_d_1 = ComputeNextTurningPoint(entry_d_0, toolpath_size, i);
@@ -398,16 +393,9 @@ namespace hpcg {
 		}
 		else
 		{
-			if (offset_index < 0)
+			for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
 			{
-				for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
-				{
-					contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
-				}
-			}
-			else
-			{
-				assert(false);
+				contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
 			}
 		}
 
@@ -549,17 +537,7 @@ namespace hpcg {
 		}
 		else
 		{
-			if (offset_index < 0)
-			{
-				for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
-				{
-					contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
-				}
-			}
-			else
-			{
-				assert(false);
-			}
+			assert(false);
 		}
 
 		SelectOnePartOffset(contour,d0, d1,vecs);
@@ -687,17 +665,7 @@ namespace hpcg {
 		}
 		else
 		{
-			if (offset_index < 0)
-			{
-				for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
-				{
-					contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
-				}
-			}
-			else
-			{
-				assert(false);
-			}
+			assert(false);
 		}
 
 		double returnD = FindNearestPointPar(v, contour);
@@ -857,17 +825,7 @@ namespace hpcg {
 		}
 		else
 		{
-			if (offset_index < 0)
-			{
-				for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
-				{
-					contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
-				}
-			}
-			else
-			{
-				assert(false);
-			}
+			assert(false);
 		}
 
 		double returnd=DeltaDEuclideanDistance(d, distance, contour);
@@ -1009,17 +967,7 @@ namespace hpcg {
 		}
 		else
 		{
-			if (offset_index < 0)
-			{
-				for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
-				{
-					contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
-				}
-			}
-			else
-			{
-				assert(false);
-			}
+			assert(false);
 		}
 
 		Vector2d v=GetOnePointFromOffset(d,contour);

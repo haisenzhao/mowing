@@ -162,7 +162,7 @@ namespace hpcg {
 		ToolpathGenerator();
 		void Init(TMeshProcessor* render);
 		void LoadContour();
-		void ComputeOffsets();
+		void ComputeOffsets(std::vector<Vector2d> &contour);
 
 		void BuildeImageSpace();
 		void StepDebug();
@@ -172,9 +172,9 @@ namespace hpcg {
 		void Rendering();
 
 		//offset fermat spiral
-		void FermatSpiral();
+		void FermatSpiral(std::vector<Vector2d> &contour, Vector2d input_entry_point, Vector2d input_exit_point );
 		void GenerateZigzag();
-		void ArchinedeanSpiral();
+		void ArchinedeanSpiral(std::vector<Vector2d> &contour);
 
 		double FindNearestPointPar(Vector2d v, int offset_index);
 		double FindNearestPointPar(Vector2d v, std::vector<Vector2d> &contour);
