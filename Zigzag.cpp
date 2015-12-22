@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "ToolpathGenerator.h"
 #include "MeshProcessor.h"
-
+#include "Circuit.h"
 
 namespace hpcg {
 
@@ -10,11 +10,13 @@ namespace hpcg {
 	{
 		std::ofstream file(path);
 
+		double scale = 0.4 / toolpath_size;
+
 		if (file.is_open())
 		{
 			for (int i = 0; i < vecs.size(); i++)
 			{
-				file << vecs[i][0] << " " << vecs[i][1] << std::endl;
+				file << vecs[i][0] * scale << " " << vecs[i][1] * scale << std::endl;
 			}
 		}
 		file.clear();
@@ -23,11 +25,19 @@ namespace hpcg {
 
 	void ToolpathGenerator::GenerateZigzag()
 	{
-		for (int i = 0; i < 4; i++)
+		for (int i = 0; i < smooth_number; i++)
 			PolygonSmoothing();
 
+		std::vector<Vector2d> contour;
+
+		for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
+		{
+			contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
+		}
+
+
 		std::vector<Vector2d> offset;
-		GenerateOffset(-1, toolpath_size / 2.0, offset);
+		Circuit::GenerateOffset(contour, toolpath_size / 2.0, offset);
 
 		int i = 0;
 
@@ -82,7 +92,7 @@ namespace hpcg {
 				}
 			}
 		}
-
+		std::vector<Vector2d>().swap(contour);
 	}
 }
 

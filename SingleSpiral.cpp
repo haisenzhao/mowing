@@ -1,13 +1,14 @@
 #include "stdafx.h"
 #include "ToolpathGenerator.h"
 #include "MeshProcessor.h"
-
+#include "Strip.h"
+#include "Circuit.h"
 
 namespace hpcg {
 
-	void ToolpathGenerator::ArchinedeanSpiral(std::vector<Vector2d> &contour)
+	void ToolpathGenerator::ArchinedeanSpiralSmooth(std::vector<Vector2d> &contour)
 	{
-		for (int i = 0; i < 3; i++)
+		for (int i = 0; i <smooth_number; i++)
 			PolygonSmoothing();
 
 		std::vector<Vector2d> contour1;
@@ -17,6 +18,54 @@ namespace hpcg {
 			contour1.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
 		}
 
+		std::cout << "Contour nb: " << contour1.size() << std::endl;
+
+		ComputeOffsets(contour1);
+
+		for (int i = 0; i < offsets.size()-1; i++)
+		{
+			std::vector<Vector2d> current_half;
+			std::vector<Vector2d> next_half;
+
+			Circuit::SelectOnePartOffset(offsets[i], entry_d_0, entry_d_0, current_half);
+			for (int j = 0; j < current_half.size(); j++)
+			{
+				double d = Circuit::FindNearestPointPar(current_half[j], offsets[i + 1]);
+				Vector2d v = Circuit::GetOnePointFromOffset(d, offsets[i + 1]);
+				next_half.push_back(v);
+			}
+
+			Strip::StripDeformation(current_half, next_half);
+			
+			for (int j = 0; j < current_half.size(); j++)
+			{
+				entry_spiral.push_back(current_half[j]);
+			}
+
+			std::vector<Vector2d>().swap(current_half);
+			std::vector<Vector2d>().swap(next_half);
+
+			Vector2d entry_p_0 = Circuit::GetOnePointFromOffset(entry_d_0, offsets[i]);
+
+			entry_d_0 = Circuit::FindNearestPointPar(entry_p_0, offsets[i + 1]);
+
+		}
+	}
+
+	void ToolpathGenerator::ArchinedeanSpiral(std::vector<Vector2d> &contour)
+	{
+		for (int i = 0; i <smooth_number; i++)
+			PolygonSmoothing();
+
+		std::vector<Vector2d> contour1;
+
+		for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
+		{
+			contour1.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
+		}
+
+		std::cout << "Contour nb: " << contour1.size() << std::endl;
+
 		ComputeOffsets(contour1);
 
 		for (int i = 0; i < offsets.size(); i++)
@@ -24,11 +73,18 @@ namespace hpcg {
 			std::cout << i << " / " << offsets.size() << std::endl;
 			double entry_d_1 = ComputeNextTurningPoint(entry_d_0, toolpath_size, i);
 			
-			SelectOnePartOffset(i, entry_d_0, entry_d_1, entry_spiral);
+			Circuit::SelectOnePartOffset(offsets[i], entry_d_0, entry_d_1, entry_spiral);
+			Vector2d v = Circuit::GetOnePointFromOffset(entry_d_0,offsets[i]);
 
 			if (i != offsets.size() - 1)
-				entry_d_0 = FindNearestPointPar(entry_spiral[entry_spiral.size() - 1], i + 1);
+				entry_d_0 = Circuit::FindNearestPointPar(v, offsets[i + 1]);
 		}
+
+		if (abs(entry_spiral[entry_spiral.size() - 1][0]) < 0.00001&&abs(entry_spiral[entry_spiral.size() - 1][1]) < 0.00001)
+		{
+			entry_spiral.erase(entry_spiral.begin() + entry_spiral.size()-1);
+		}
+
 	}
 
 	void ToolpathGenerator::PolygonSmoothing()

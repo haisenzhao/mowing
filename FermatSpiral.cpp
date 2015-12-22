@@ -1,27 +1,40 @@
 #include "stdafx.h"
 #include "ToolpathGenerator.h"
 #include "MeshProcessor.h"
-
+#include "Strip.h"
+#include "Circuit.h"
 
 namespace hpcg {
 
 	void ToolpathGenerator::ComputeOffsets(std::vector<Vector2d> &contour)
 	{
 		double lOffset = toolpath_size / 2.0;
-		std::vector<Vector2d> one_path;
-		GenerateOffset(contour, lOffset, one_path);
-		while (one_path.size() > 0)
+		std::vector<std::vector<Vector2d>> one_pathes;
+		Circuit::GenerateOffset(contour, lOffset, one_pathes);
+
+		while (one_pathes.size() > 0)
 		{
-			offsets.push_back(one_path);
-			std::vector<Vector2d>().swap(one_path);
+			std::cout << "Offsets index: " << offsets.size() << std::endl;
+
+			for (int i = 0; i < one_pathes.size(); i++)
+			{
+				offsets.push_back(one_pathes[i]);
+			}
+
+			for (int i = 0; i < one_pathes.size(); i++)
+			{
+				std::vector<Vector2d>().swap(one_pathes[i]);
+			}
+			std::vector<std::vector<Vector2d>>().swap(one_pathes);
+		
 			lOffset = lOffset + toolpath_size;
-			GenerateOffset(contour, lOffset, one_path);
+			Circuit::GenerateOffset(contour, lOffset, one_pathes);
 		}
 	}
 
 	bool CompareTwoDouble(double d0, double d1, double d)
 	{
-		if (d0 < d1)
+		if (d0 < d1)  
 		{
 			if (d >= d0 && d <= d1)
 				return true;
@@ -37,26 +50,297 @@ namespace hpcg {
 		}
 	}
 
+	void ToolpathGenerator::FermatsSpiralTrick(std::vector<Vector2d> &contour, Vector2d input_entry_point, Vector2d input_exit_point)
+	{
+		ComputeOffsets(contour);
+
+		entry_d_0 = Circuit::FindNearestPointPar(input_entry_point, offsets[0]);
+		exit_d_0 = Circuit::FindNearestPointPar(input_exit_point, offsets[0]);
+
+		for (int i = 0; i < offsets.size() - 1; i++)
+		{
+			Vector2d entry_p_0 = Circuit::GetOnePointFromOffset(entry_d_0, offsets[i]);
+			Vector2d exit_p_0 = Circuit::GetOnePointFromOffset(exit_d_0, offsets[i]);
+
+			double entry_d_1 = Circuit::FindNearestPointPar(entry_p_0, offsets[i + 1]);
+			double exit_d_1 = Circuit::FindNearestPointPar(exit_p_0, offsets[i + 1]);
+
+			Vector2d entry_p_1 = Circuit::GetOnePointFromOffset(entry_d_1, offsets[i + 1]);
+			Vector2d exit_p_1 = Circuit::GetOnePointFromOffset(exit_d_1, offsets[i+1]);
+
+			//////
+			std::vector<Vector2d> half;
+			std::vector<Vector2d> next_half;
+			Circuit::SelectOnePartOffset(offsets[i], entry_d_0, exit_d_0, half);
+			Circuit::SelectOnePartOffset(offsets[i + 1], exit_d_1, entry_d_1, next_half);
+			
+			//double d = Strip::IntersectPoint(half, Circuit::GetTangent(exit_p_1, offsets[i + 1]));
+			double d = Strip::IntersectPoint(half, next_half[0], next_half[1]);
+			double d0 = ComputeNextTurningPoint(exit_d_0, toolpath_size, i);
+
+			if (Strip::Distance(exit_p_0, Circuit::GetOnePointFromOffset(d, offsets[i])) <
+				Strip::Distance(exit_p_0, Circuit::GetOnePointFromOffset(d0, offsets[i])))
+			{
+				d = d0;
+			}
+
+			std::vector<Vector2d> path;
+			Strip::SelectOnePart(half, 0.0, d, path);
+
+			if (i % 2 == 0)
+			{
+				for (int j = 0; j < path.size(); j++)
+				{
+					entry_spiral.push_back(path[j]);
+				}
+				entry_spiral.push_back(next_half[0]);
+			}
+			else
+			{
+				for (int j = 0; j < path.size(); j++)
+				{
+					exit_spiral.push_back(path[j]);
+				}
+				exit_spiral.push_back(next_half[0]);
+			}
+
+			std::vector<Vector2d>().swap(path);
+			std::vector<Vector2d>().swap(half);
+			std::vector<Vector2d>().swap(next_half);
+
+			//////
+			Circuit::SelectOnePartOffset(offsets[i], exit_d_0, entry_d_0, half);
+			Circuit::SelectOnePartOffset(offsets[i + 1], entry_d_1, exit_d_1, next_half);
+
+			//d = Strip::IntersectPoint(half, Circuit::GetTangent(entry_p_1, offsets[i + 1]));
+			d = Strip::IntersectPoint(half, next_half[0], next_half[1]);
+
+			d0 = ComputeNextTurningPoint(entry_d_0, toolpath_size, i);
+
+			if (Strip::Distance(entry_p_0, Circuit::GetOnePointFromOffset(d, offsets[i])) <
+				Strip::Distance(entry_p_0, Circuit::GetOnePointFromOffset(d0, offsets[i])))
+			{
+				d = d0;
+			}
+
+			Strip::SelectOnePart(half, 0.0, d, path);
+
+			if (i % 2 == 0)
+			{
+				for (int j = 0; j < path.size(); j++)
+				{
+					exit_spiral.push_back(path[j]);
+				}
+				exit_spiral.push_back(next_half[0]);
+			}
+			else
+			{
+				for (int j = 0; j < path.size(); j++)
+				{
+					entry_spiral.push_back(path[j]);
+				}
+				entry_spiral.push_back(next_half[0]);
+			}
+
+			std::vector<Vector2d>().swap(path);
+			std::vector<Vector2d>().swap(half);
+			std::vector<Vector2d>().swap(next_half);
+
+			entry_d_0 = entry_d_1;
+			exit_d_0 = exit_d_1;
+
+		}
+	}
+
+	void ToolpathGenerator::FermatsSpiralSmooth1(std::vector<Vector2d> &contour, Vector2d input_entry_point, Vector2d input_exit_point)
+	{
+		ComputeOffsets(contour);
+
+		std::vector<Vector2d> offset_0;
+		std::vector<Vector2d> offset_1;
+
+		Circuit::GenerateOffset(contour, toolpath_size*0.5, offset_0);
+		Circuit::GenerateOffset(contour, toolpath_size*1.5, offset_1);
+
+		entry_d_0 = Circuit::FindNearestPointPar(input_entry_point, offset_0);
+		exit_d_0 = Circuit::FindNearestPointPar(input_exit_point, offset_0);
+
+
+		//first
+		Vector2d entry_p_0 = Circuit::GetOnePointFromOffset(entry_d_0, offset_0);
+		Vector2d exit_p_0 = Circuit::GetOnePointFromOffset(exit_d_0, offset_0);
+
+		double entry_d_1 = Circuit::FindNearestPointPar(entry_p_0, offset_1);
+		double exit_d_1 = Circuit::FindNearestPointPar(exit_p_0, offset_1);
+
+		//////
+		std::vector<Vector2d> half;
+		std::vector<Vector2d> next_half;
+		Circuit::SelectOnePartOffset(offset_0, entry_d_0, exit_d_0, half);
+		Circuit::SelectOnePartOffset(offset_1, exit_d_1, entry_d_1, next_half);
+
+		std::vector<Vector2d> entry_path;
+		Strip::SelectOnePart(half, 0.0, Strip::IntersectPoint(half, next_half[0], next_half[1]), entry_path);
+		entry_path.push_back(next_half[0]);
+
+		for (int j = 0; j < entry_path.size(); j++)
+		{
+			entry_spiral.push_back(entry_path[j]);
+		}
+
+		//std::vector<Vector2d>().swap(entry_path);
+		std::vector<Vector2d>().swap(half);
+		std::vector<Vector2d>().swap(next_half);
+
+		//////
+		Circuit::SelectOnePartOffset(offset_0, exit_d_0, entry_d_0, half);
+		Circuit::SelectOnePartOffset(offset_1, entry_d_1, exit_d_1, next_half);
+
+		std::vector<Vector2d> exit_path;
+		Strip::SelectOnePart(half, 0.0, Strip::IntersectPoint(half, next_half[0], next_half[1]), exit_path);
+		exit_path.push_back(next_half[0]);
+		for (int j = 0; j < exit_path.size(); j++)
+		{
+			exit_spiral.push_back(exit_path[j]);
+		}
+
+		//std::vector<Vector2d>().swap(exit_path);
+		std::vector<Vector2d>().swap(half);
+		std::vector<Vector2d>().swap(next_half);
+
+
+		//entry_path->halp
+		Circuit::SelectOnePartOffset(offset_0, exit_d_0, entry_d_0, half);
+		Circuit::SelectOnePartOffset(offset_0, entry_d_0, exit_d_0, next_half);
+		std::vector<Vector2d>().swap(offset_0);
+		std::vector<Vector2d>().swap(offset_1);
+
+		for (int i = 1; i < entry_path.size(); i++)
+		{
+			half.push_back(entry_path[i]);
+		}
+		Circuit::GenerateOffset(half, toolpath_size, offset_0);
+	
+		//exit_path->next_half
+		for (int i = 1; i < exit_path.size(); i++)
+		{
+			next_half.push_back(exit_path[i]);
+		}
+		Circuit::GenerateOffset(next_half, toolpath_size, offset_1);
+
+		std::vector<Vector2d>().swap(half);
+		std::vector<Vector2d>().swap(next_half);
+
+		entry_d_0 = Circuit::FindNearestPointPar(entry_spiral[entry_spiral.size() - 1], offset_0);
+		exit_d_0 = Circuit::FindNearestPointPar(exit_spiral[exit_spiral.size() - 1], offset_0);
+
+		Circuit::SelectOnePartOffset(offset_0, entry_d_0, exit_d_0, half);
+
+		for (int i = 1; i < half.size(); i++)
+		{
+			entry_spiral.push_back(half[i]);
+		}
+
+	}
+
+	void ToolpathGenerator::FermatsSpiralSmooth(std::vector<Vector2d> &contour, Vector2d input_entry_point, Vector2d input_exit_point)
+	{
+		ComputeOffsets(contour);
+
+		entry_d_0 = Circuit::FindNearestPointPar(input_entry_point, offsets[0]);
+		exit_d_0 = Circuit::FindNearestPointPar(input_exit_point, offsets[0]);
+
+		for (int i = 0; i < offsets.size()-1; i++)
+		{
+			std::vector<Vector2d> current_half;
+			std::vector<Vector2d> next_half;
+
+			Circuit::SelectOnePartOffset(offsets[i], entry_d_0, exit_d_0, current_half);
+			for (int j = 0; j < current_half.size(); j++)
+			{
+				double d = Circuit::FindNearestPointPar(current_half[j], offsets[i + 1]);
+				Vector2d v = Circuit::GetOnePointFromOffset(d, offsets[i + 1]);
+				next_half.push_back(v);
+			}
+
+			Strip::StripDeformation(current_half, next_half);
+			for (int j = 0; j < current_half.size(); j++)
+			{
+				if (i % 2 == 0)
+					entry_spiral.push_back(current_half[j]);
+				else
+					exit_spiral.push_back(current_half[j]);
+			}
+			std::vector<Vector2d>().swap(current_half);
+			std::vector<Vector2d>().swap(next_half);
+
+			Circuit::SelectOnePartOffset(offsets[i], exit_d_0, entry_d_0, current_half);
+
+			for (int j = 0; j < current_half.size(); j++)
+			{
+				double d = Circuit::FindNearestPointPar(current_half[j], offsets[i + 1]);
+				Vector2d v = Circuit::GetOnePointFromOffset(d, offsets[i + 1]);
+				next_half.push_back(v);
+			}
+
+			Strip::StripDeformation(current_half, next_half);
+			for (int j = 0; j < current_half.size(); j++)
+			{
+				if (i % 2 == 0)
+					exit_spiral.push_back(current_half[j]);
+				else
+					entry_spiral.push_back(current_half[j]);
+			}
+			std::vector<Vector2d>().swap(current_half);
+			std::vector<Vector2d>().swap(next_half);
+
+			Vector2d entry_p_0 = Circuit::GetOnePointFromOffset(entry_d_0, offsets[i]);
+			Vector2d exit_p_0 = Circuit::GetOnePointFromOffset(exit_d_0, offsets[i]);
+
+			entry_d_0 = Circuit::FindNearestPointPar(entry_p_0, offsets[i + 1]);
+			exit_d_0 = Circuit::FindNearestPointPar(exit_p_0, offsets[i + 1]);
+
+		}
+
+		std::vector<Vector2d> half_0;
+		std::vector<Vector2d> half_1;
+
+		Circuit::SelectOnePartOffset(offsets[offsets.size() - 1], entry_d_0, exit_d_0, half_0);
+		Circuit::SelectOnePartOffset(offsets[offsets.size() - 1], exit_d_0, entry_d_0, half_1);
+
+		if (Strip::GetTotalLength(half_0) > Strip::GetTotalLength(half_1))
+		{
+
+		}
+
+		std::vector<Vector2d>().swap(half_0);
+		std::vector<Vector2d>().swap(half_1);
+
+	}
+
 	void ToolpathGenerator::FermatSpiral(std::vector<Vector2d> &contour, Vector2d input_entry_point, Vector2d input_exit_point)
 	{
 		ComputeOffsets(contour);
 
-		entry_d_0 = FindNearestPointPar(input_entry_point, 0);
-		exit_d_0 = FindNearestPointPar(input_exit_point, 0);
-
-		//entry_d_0 = 0.36;
-	//	exit_d_0 = 0.73;
+		entry_d_0 = Circuit::FindNearestPointPar(input_entry_point, offsets[0]);
+		exit_d_0 = Circuit::FindNearestPointPar(input_exit_point, offsets[0]);
 
 		bool b0 = false;
 
 		std::vector<Vector2d> offset;
-		GenerateOffset(offsets.size() - 1, toolpath_size / 2, offset);
+		Circuit::GenerateOffset(offsets[offsets.size() - 1], toolpath_size / 2, offset);
 		if (offset.size() == 0)
 			b0=true;
 		std::vector<Vector2d>().swap(offset);
 
-		for (int i = 0; i < offsets.size(); i++)
+		for (int i = 0; i < offsets.size()-1; i++)
 		{
+
+			if (i == offsets.size() - 2)
+			{
+				int dsad = 10;
+			}
+
 			bool goon = true;
 
 			double entry_d_1 = ComputeNextTurningPoint(entry_d_0, toolpath_size, i);
@@ -102,23 +386,22 @@ namespace hpcg {
 				move_exit_d_1 = false;
 			}
 
-			Vector2d entry_p_0 = GetOnePointFromOffset(entry_d_0, i);
-			Vector2d entry_p_1 = GetOnePointFromOffset(entry_d_1, i);
-			Vector2d exit_p_0 = GetOnePointFromOffset(exit_d_0, i);
-			Vector2d exit_p_1 = GetOnePointFromOffset(exit_d_1, i);
-
+			Vector2d entry_p_0 = Circuit::GetOnePointFromOffset(entry_d_0, offsets[i]);
+			Vector2d entry_p_1 = Circuit::GetOnePointFromOffset(entry_d_1, offsets[i]);
+			Vector2d exit_p_0 = Circuit::GetOnePointFromOffset(exit_d_0, offsets[i]);
+			Vector2d exit_p_1 = Circuit::GetOnePointFromOffset(exit_d_1, offsets[i]);
 
 			if (i < offsets.size() - 1)
 			{
-				double entry_d_1_0 = FindNearestPointPar(entry_p_1, i + 1);
-				double exit_d_1_0 = FindNearestPointPar(exit_p_1, i + 1);
+				double entry_d_1_0 = Circuit::FindNearestPointPar(entry_p_1, offsets[i + 1]);
+				double exit_d_1_0 = Circuit::FindNearestPointPar(exit_p_1, offsets[i + 1]);
 
 				if (abs(entry_d_1_0 - exit_d_1_0) < 0.000001)
 				{
 					double t = DeltaDEuclideanDistance(exit_d_1_0, toolpath_size, i + 1);
 
-					Vector2d v=GetOnePointFromOffset(t,i+1);
-					t = FindNearestPointPar(v, i);
+					Vector2d v = Circuit::GetOnePointFromOffset(t, offsets[i + 1]);
+					t = Circuit::FindNearestPointPar(v, offsets[i]);
 
 					if (!move_exit_d_1)
 					{
@@ -132,8 +415,8 @@ namespace hpcg {
 						}
 					}
 				}
-				exit_p_1=GetOnePointFromOffset(exit_d_1,i);
-				entry_p_1=GetOnePointFromOffset(entry_d_1,i);
+				exit_p_1=Circuit::GetOnePointFromOffset(exit_d_1,offsets[i]);
+				entry_p_1 = Circuit::GetOnePointFromOffset(entry_d_1, offsets[i]);
 			}
 
 
@@ -174,10 +457,9 @@ namespace hpcg {
 			if (i == offsets.size()-1)
 			{
 				Vector2d v((entry_p_1[0] + exit_p_1[0]) / 2.0, (entry_p_1[1] + exit_p_1[1]) / 2.0);
-
-				double t = MinimalDistance(offsets[i], v);
-				double t0 = FindNearestPointPar(v,i);
-
+				double t = Circuit::Distance(v, offsets[i]);
+				double t0 = Circuit::FindNearestPointPar(v, offsets[i]);
+				
 				if (t < 0.000001)
 				{
 					if (!CompareTwoDouble(entry_d_1, exit_d_1, t0))
@@ -203,12 +485,12 @@ namespace hpcg {
 						break;
 						if (b1)
 						{
-							SelectOnePartOffset(i, exit_d_0, entry_d_1, exit_spiral);
+							Circuit::SelectOnePartOffset(offsets[i], exit_d_0, entry_d_1, exit_spiral);
 							entry_spiral.push_back(entry_p_0);
 						}
 						else
 						{
-							SelectOnePartOffset(i, entry_d_0, exit_d_1, entry_spiral);
+							Circuit::SelectOnePartOffset(offsets[i], entry_d_0, exit_d_1, entry_spiral);
 							exit_spiral.push_back(exit_p_0);
 						}
 					}
@@ -216,36 +498,34 @@ namespace hpcg {
 					{
 						if (b2)
 						{
-							SelectOnePartOffset(i, entry_d_0, exit_d_1, entry_spiral);
-							SelectOnePartOffset(i, exit_d_0, entry_d_1, exit_spiral);
+							Circuit::SelectOnePartOffset(offsets[i], entry_d_0, exit_d_1, entry_spiral);
+							Circuit::SelectOnePartOffset(offsets[i], exit_d_0, entry_d_1, exit_spiral);
 						}
 						else
 						{
 							if (b1)
 							{
-								SelectOnePartOffset(i, exit_d_0, entry_d_1, exit_spiral);
+								Circuit::SelectOnePartOffset(offsets[i], exit_d_0, entry_d_1, exit_spiral);
 								entry_spiral.push_back(entry_p_0);
 							}
 							else
 							{
-								SelectOnePartOffset(i, entry_d_0, exit_d_1, entry_spiral);
+								Circuit::SelectOnePartOffset(offsets[i], entry_d_0, exit_d_1, entry_spiral);
 								exit_spiral.push_back(exit_p_0);
 							}
 						}
 					}
-
 				}
 				else
 				{
-
-					SelectOnePartOffset(i, entry_d_0, exit_d_1, entry_spiral);
-					SelectOnePartOffset(i, exit_d_0, entry_d_1, exit_spiral);
+					Circuit::SelectOnePartOffset(offsets[i], entry_d_0, exit_d_1, entry_spiral);
+					Circuit::SelectOnePartOffset(offsets[i], exit_d_0, entry_d_1, exit_spiral);
 				}
 
 				if (i + 1 < offsets.size())
 				{
-					entry_d_0 = FindNearestPointPar(exit_spiral[exit_spiral.size() - 1], i + 1);
-					exit_d_0 = FindNearestPointPar(entry_spiral[entry_spiral.size() - 1],i+1);
+					entry_d_0 = Circuit::FindNearestPointPar(exit_spiral[exit_spiral.size() - 1], offsets[i + 1]);
+					exit_d_0 = Circuit::FindNearestPointPar(entry_spiral[entry_spiral.size() - 1], offsets[i + 1]);
 				}
 			}
 			else
@@ -264,12 +544,12 @@ namespace hpcg {
 						break;
 						if (b1)
 						{
-							SelectOnePartOffset(i, exit_d_0, entry_d_1, entry_spiral);
+							Circuit::SelectOnePartOffset(offsets[i], exit_d_0, entry_d_1, entry_spiral);
 							exit_spiral.push_back(entry_p_0);
 						}
 						else
 						{
-							SelectOnePartOffset(i, entry_d_0, exit_d_1, exit_spiral);
+							Circuit::SelectOnePartOffset(offsets[i], entry_d_0, exit_d_1, exit_spiral);
 							entry_spiral.push_back(exit_p_0);
 						}
 					}
@@ -277,19 +557,19 @@ namespace hpcg {
 					{
 						if (b2)
 						{
-							SelectOnePartOffset(i, entry_d_0, exit_d_1, exit_spiral);
-							SelectOnePartOffset(i, exit_d_0, entry_d_1, entry_spiral);
+							Circuit::SelectOnePartOffset(offsets[i], entry_d_0, exit_d_1, exit_spiral);
+							Circuit::SelectOnePartOffset(offsets[i], exit_d_0, entry_d_1, entry_spiral);
 						}
 						else
 						{
 							if (b1)
 							{
-								SelectOnePartOffset(i, exit_d_0, entry_d_1, entry_spiral);
+								Circuit::SelectOnePartOffset(offsets[i], exit_d_0, entry_d_1, entry_spiral);
 								exit_spiral.push_back(entry_p_0);
 							}
 							else
 							{
-								SelectOnePartOffset(i, entry_d_0, exit_d_1, exit_spiral);
+								Circuit::SelectOnePartOffset(offsets[i], entry_d_0, exit_d_1, exit_spiral);
 								entry_spiral.push_back(exit_p_0);
 							}
 						}
@@ -298,382 +578,22 @@ namespace hpcg {
 				}
 				else
 				{
-					SelectOnePartOffset(i, entry_d_0, exit_d_1, exit_spiral);
-					SelectOnePartOffset(i, exit_d_0, entry_d_1, entry_spiral);
+					Circuit::SelectOnePartOffset(offsets[i], entry_d_0, exit_d_1, exit_spiral);
+					Circuit::SelectOnePartOffset(offsets[i], exit_d_0, entry_d_1, entry_spiral);
 				}
 
 				if (i + 1 < offsets.size())
 				{
-					entry_d_0 = FindNearestPointPar(entry_spiral[entry_spiral.size() - 1], i + 1);
-					exit_d_0 = FindNearestPointPar(exit_spiral[exit_spiral.size() - 1], i + 1);
+					entry_d_0 = Circuit::FindNearestPointPar(entry_spiral[entry_spiral.size() - 1], offsets[i + 1]);
+					exit_d_0 = Circuit::FindNearestPointPar(exit_spiral[exit_spiral.size() - 1], offsets[i + 1]);
 				}
 			}
 
 			if (!goon)
 				break;
 		}
-
-
-		/*
-		int i = entry_spiral.size() - 1;
-
-		do
-		{
-			if (MinimalDistance(exit_spiral, entry_spiral[i]) < toolpath_size - 0.00001)
-			{
-				entry_spiral.erase(entry_spiral.begin() + i);
-				i = entry_spiral.size() - 1;
-			}
-			else
-			{
-				break;
-			}
-
-		} while (true);
-
-
-		i = exit_spiral.size() - 1;
-
-		do
-		{
-			if (MinimalDistance(entry_spiral, exit_spiral[i]) < toolpath_size - 0.00001)
-			{
-				exit_spiral.erase(exit_spiral.begin() + i);
-				i = exit_spiral.size() - 1;
-			}
-			else
-			{
-				break;
-			}
-
-		} while (true);
-		*/
 	}
 
-
-
-	double ToolpathGenerator::MinimalDistanceSegments(std::vector<Vector2d> &segments, Vector2d &v)
-	{
-		double m_d = MAXDOUBLE;
-
-		for (int i = 0; i < segments.size(); i = i + 2)
-		{
-			double d = sqrt((double)CGAL::squared_distance(Point_2(v.x, v.y), Segment_2(Point_2(segments[i].x, segments[i].y), Point_2(segments[i + 1].x, segments[i + 1].y))));
-			m_d = min(m_d, d);
-		}
-
-		return m_d;
-	}
-
-	double ToolpathGenerator::MinimalDistance(std::vector<Vector2d> &vecs, Vector2d &v)
-	{
-		double m_d = MAXDOUBLE;
-
-		for (int i = 0; i < vecs.size()-1; i++)
-		{
-			double d = sqrt((double)CGAL::squared_distance(Point_2(v.x, v.y), Segment_2(Point_2(vecs[i].x, vecs[i].y), Point_2(vecs[i+1].x, vecs[i+1].y))));
-
-			m_d = min(m_d,d);
-		}
-
-		return m_d;
-
-	}
-	
-	void ToolpathGenerator::GenerateOffset(int offset_index, double lOffset, std::vector<Vector2d> &offset)
-	{
-		std::vector<Vector2d> contour;
-
-		if (offset_index >= 0 && offset_index <= offsets.size() - 1)
-		{
-			for (int i = 0; i < offsets[offset_index].size(); i++)
-			{
-				contour.push_back(offsets[offset_index][i]);
-			}
-		}
-		else
-		{
-			for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
-			{
-				contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
-			}
-		}
-
-		GenerateOffset(contour, lOffset, offset);
-
-		std::vector<Vector2d>().swap(contour);
-	}
-	void ToolpathGenerator::GenerateOffset(std::vector<Vector2d> &contour, double lOffset, std::vector<Vector2d> &offset)
-	{
-		Polygon_2 polygon;
-
-		for (int i = 0; i < contour.size(); i++)
-		{
-			polygon.push_back(Point_2(contour[i][0], contour[i][1]));
-		}
-
-		if (polygon.is_simple())
-		{
-			if (polygon.is_clockwise_oriented())
-			{
-				polygon.reverse_orientation();
-			}
-
-			PolygonPtrVector offset_polygons = CGAL::create_interior_skeleton_and_offset_polygons_2(lOffset, polygon);
-
-			for (PolygonPtrVector::const_iterator pi = offset_polygons.begin(); pi != offset_polygons.end(); ++pi)
-			{
-				for (Polygon_2::Vertex_const_iterator vi = (**pi).vertices_begin(); vi != (**pi).vertices_end(); ++vi)
-				{
-					offset.push_back(Vector2d((*vi).x(), (*vi).y()));
-				}
-			}
-		}
-		else
-		{
-			assert(false);
-		}
-
-	}
-	void ToolpathGenerator::SelectOnePartOffset(std::vector<Vector2d> &contour, double d0, double d1, std::vector<Vector2d> &vecs)
-	{
-		if (abs(d0 - d1) < 0.0000001)
-		{
-			Vector2d v=GetOnePointFromOffset(d0,contour);
-			vecs.push_back(v);
-		}
-		else
-		{
-			double total_length = 0.0;
-			for (int i = 0; i < contour.size(); i++)
-			{
-				total_length += sqrt((double)CGAL::squared_distance(Point_2(contour[i].x, contour[i].y), Point_2(contour[(i + 1) % contour.size()].x, contour[(i + 1) % contour.size()].y)));
-			}
-			
-			std::vector<double> vec_ds;
-			
-			vec_ds.push_back(0.0);
-			double length = 0.0;
-			for (int i = 0; i < contour.size(); i++)
-			{
-				length += sqrt((double)CGAL::squared_distance(Point_2(contour[i].x, contour[i].y), Point_2(contour[(i + 1) % contour.size()].x, contour[(i + 1) % contour.size()].y)));
-				vec_ds.push_back(length / total_length);
-			}
-
-			Vector2d v=GetOnePointFromOffset(d0,contour);
-			vecs.push_back(v);
-
-			if (d0 > d1)
-			{
-				for (int i = vec_ds.size() - 1; i >= 0; i--)
-				{
-					if (vec_ds[i]<d0&&vec_ds[i]>d1)
-					{
-						v = GetOnePointFromOffset(vec_ds[i],contour);
-
-						if (!(abs(v[0] - vecs[vecs.size() - 1][0]) < 0.000001&&abs(v[1] - vecs[vecs.size() - 1][1]) < 0.000001))
-						{
-							vecs.push_back(v);
-						}
-
-					
-					}
-
-					if (vec_ds[i] < d1)
-					{
-						break;
-					}
-				}
-			}
-			else
-			{
-				for (int i = vec_ds.size() - 1; i >0; i--)
-				{
-					if (vec_ds[i] < d0)
-					{
-						v = GetOnePointFromOffset(vec_ds[i],contour);
-
-						if (!(abs(v[0] - vecs[vecs.size() - 1][0]) < 0.000001&&abs(v[1] - vecs[vecs.size() - 1][1]) < 0.000001))
-						{
-							vecs.push_back(v);
-						}
-					}
-				}
-
-				for (int i = vec_ds.size() - 1; i >0; i--)
-				{
-					if (vec_ds[i] > d1)
-					{
-						v = GetOnePointFromOffset(vec_ds[i],contour);
-						if (!(abs(v[0] - vecs[vecs.size() - 1][0]) < 0.000001&&abs(v[1] - vecs[vecs.size() - 1][1]) < 0.000001))
-						{
-							vecs.push_back(v);
-						}
-					}
-				}
-			}
-
-			v=GetOnePointFromOffset(d1,contour);
-			if (!(abs(v[0] - vecs[vecs.size() - 1][0]) < 0.000001&&abs(v[1] - vecs[vecs.size() - 1][1]) < 0.000001))
-			{
-				vecs.push_back(v);
-			}
-
-			std::vector<double>().swap(vec_ds);
-		}
-
-		
-	}
-	void ToolpathGenerator::SelectOnePartOffset(int offset_index, double d0, double d1, std::vector<Vector2d> &vecs)
-	{
-		std::vector<Vector2d> contour;
-
-		if (offset_index >= 0 && offset_index <= offsets.size() - 1)
-		{
-			for (int i = 0; i < offsets[offset_index].size(); i++)
-			{
-				contour.push_back(offsets[offset_index][i]);
-			}
-		}
-		else
-		{
-			assert(false);
-		}
-
-		SelectOnePartOffset(contour,d0, d1,vecs);
-		std::vector<Vector2d>().swap(contour);
-	}
-	double ToolpathGenerator::FindNearestPointPar(Vector2d v, std::vector<Vector2d> &contour)
-	{
-		Vector2d n_p;
-
-		double total_length = 0.0;
-		for (int i = 0; i < contour.size(); i++)
-		{
-			total_length += sqrt((double)CGAL::squared_distance(Point_2(contour[i].x, contour[i].y), Point_2(contour[(i + 1) % contour.size()].x, contour[(i + 1) % contour.size()].y)));
-		}
-
-		double min_d = MAXDOUBLE;
-		int min_i = -1;
-		for (int i = 0; i < contour.size(); i++)
-		{
-			Point_2 p0(contour[i].x, contour[i].y);
-			Point_2 p1(contour[(i + 1) % contour.size()].x, contour[(i + 1) % contour.size()].y);
-
-			double l = sqrt((double)CGAL::squared_distance(Point_2(v[0], v[1]), Segment_2(p0, p1)));
-
-			if (l < min_d)
-			{
-				min_d = l;
-				min_i = i;
-			}
-		}
-
-
-		if (min_i >= 0)
-		{
-
-			double length = 0.0;
-			for (int i = 0; i < min_i; i++)
-			{
-				length += sqrt((double)CGAL::squared_distance(Point_2(contour[i].x, contour[i].y), Point_2(contour[(i + 1) % contour.size()].x, contour[(i + 1) % contour.size()].y)));
-			}
-
-			Point_2 p0(contour[min_i].x, contour[min_i].y);
-			Point_2 p1(contour[(min_i + 1) % contour.size()].x, contour[(min_i + 1) % contour.size()].y);
-
-			double l0 = sqrt((double)CGAL::squared_distance(Point_2(v[0], v[1]), p0));
-			double l1 = sqrt((double)CGAL::squared_distance(Point_2(v[0], v[1]), p1));
-
-			if (min_d<l0 &&min_d<l1)
-			{
-				double l = sqrt((double)CGAL::squared_distance(p0, p1));
-				if (l < 0.00001)
-				{
-					v[0] = p0[0];
-					v[1] = p0[1];
-				}
-				else
-				{
-					Vector2d vec(p1[0] - p0[0], p1[1] - p0[1]);
-					Vector2d r_vec(vec[1], -vec[0]);
-					if (vec[0] < 0.00001)
-					{
-						r_vec[0] = -vec[1];
-						r_vec[1] = vec[0];
-					}
-
-					if (vec[1] < 0.00001)
-					{
-						r_vec[0] = vec[1];
-						r_vec[1] = -vec[0];
-					}
-
-					CGAL::Object result = CGAL::intersection(Segment_2(p0, p1), Line_2(Point_2(v[0], v[1]), Point_2(v[0] + r_vec[0], v[1] + r_vec[1])));
-
-					if (const Point_2 *ipoint = CGAL::object_cast<Point_2>(&result))
-					{
-						n_p[0] = ipoint->x();
-						n_p[1] = ipoint->y();
-					}
-					else
-					{
-						assert(false);
-					}
-				}
-			}
-			else
-			{
-				if (l0 < l1)
-				{
-					n_p[0] = p0[0];
-					n_p[1] = p0[1];
-				}
-				else
-				{
-					n_p[0] = p1[0];
-					n_p[1] = p1[1];
-				}
-
-			}
-
-			length += sqrt((double)CGAL::squared_distance(Point_2(contour[min_i].x, contour[min_i].y), Point_2(n_p[0], n_p[1])));
-
-			return length / total_length;
-		}
-		else
-		{
-			assert(false);
-		}
-
-		return -1.0;
-
-
-
-	}
-	
-	double ToolpathGenerator::FindNearestPointPar(Vector2d v, int offset_index)
-	{
-		std::vector<Vector2d> contour;
-
-		if (offset_index >= 0 && offset_index <= offsets.size() - 1)
-		{
-			for (int i = 0; i < offsets[offset_index].size(); i++)
-			{
-				contour.push_back(offsets[offset_index][i]);
-			}
-		}
-		else
-		{
-			assert(false);
-		}
-
-		double returnD = FindNearestPointPar(v, contour);
-		std::vector<Vector2d>().swap(contour);
-
-		return returnD;
-	}
-	
 	double ToolpathGenerator::DeltaDGeodesicDistance(double d, double distance, std::vector<Vector2d> &contour)
 	{
 		double total_length = 0.0;
@@ -716,11 +636,11 @@ namespace hpcg {
 		{
 	
 			double d0 = DeltaDEuclideanDistance(d, distance, offset_index);
-			Vector2d v0=GetOnePointFromOffset(d0,offset_index);
-			double d1 = FindNearestPointPar(v0, offset_index + 1);
-			Vector2d v1=GetOnePointFromOffset(d1, offset_index + 1);
-			Vector2d v2=GetOnePointFromOffset(d,offset_index);
-			double d2 = FindNearestPointPar(v2, offset_index + 1);
+			Vector2d v0 = Circuit::GetOnePointFromOffset(d0, offsets[offset_index]);
+			double d1 = Circuit::FindNearestPointPar(v0, offsets[offset_index + 1]);
+			Vector2d v1 = Circuit::GetOnePointFromOffset(d1, offsets[offset_index + 1]);
+			Vector2d v2 = Circuit::GetOnePointFromOffset(d, offsets[offset_index]);
+			double d2 = Circuit::FindNearestPointPar(v2, offsets[offset_index + 1]);
 			
 			if (abs(d2-d1)>0.0001)
 			{
@@ -762,7 +682,7 @@ namespace hpcg {
 
 				for (int i = 0; i < vecs.size(); i++)
 				{
-					double delta_d = FindNearestPointPar(vecs[i], offset_index);
+					double delta_d = Circuit::FindNearestPointPar(vecs[i], offsets[offset_index]);
 
 					if (abs(delta_d - d) > 0.5)
 					{
@@ -789,7 +709,7 @@ namespace hpcg {
 							if (t > 1.0)
 								t = t - 1.0;
 
-							Vector2d v=GetOnePointFromOffset(t,offset_index);
+							Vector2d v = Circuit::GetOnePointFromOffset(t, offsets[offset_index]);
 
 							double length = sqrt((double)CGAL::squared_distance(Point_2(v2[0], v2[1]), Line_2(Point_2(v[0], v[1]), Point_2(v1[0], v1[1]))));
 							if (abs(length - distance) < min_d)
@@ -835,7 +755,7 @@ namespace hpcg {
 
 	double ToolpathGenerator::DeltaDEuclideanDistance(double d, double distance, std::vector<Vector2d> &contour)
 	{
-		Vector2d v=GetOnePointFromOffset(d,contour);
+		Vector2d v=Circuit::GetOnePointFromOffset(d,contour);
 
 		std::vector<Vector2d> vecs;
 
@@ -864,7 +784,7 @@ namespace hpcg {
 		{
 			for (int i = 0; i < vecs.size(); i++)
 			{
-				double delta_d = FindNearestPointPar(vecs[i], contour);
+				double delta_d = Circuit::FindNearestPointPar(vecs[i], contour);
 
 				if (abs(delta_d - d) > 0.5)
 				{
@@ -892,7 +812,7 @@ namespace hpcg {
 		{
 			for (int i = 0; i < vecs.size(); i++)
 			{
-				double delta_d = FindNearestPointPar(vecs[i], contour);
+				double delta_d = Circuit::FindNearestPointPar(vecs[i], contour);
 
 				if (abs(delta_d - d) > 0.5)
 				{
@@ -921,59 +841,5 @@ namespace hpcg {
 		return -1.0;
 	}
 
-
-
-	Vector2d ToolpathGenerator::GetOnePointFromOffset(double d,std::vector<Vector2d> &contour)
-	{
-		Vector2d v;
-		double length = 0.0;
-		for (int i = 0; i < contour.size(); i++)
-		{
-			length += sqrt((double)CGAL::squared_distance(Point_2(contour[i].x, contour[i].y), Point_2(contour[(i + 1) % contour.size()].x, contour[(i + 1) % contour.size()].y)));
-		}
-
-		double total_length = length;
-		length = 0.0;
-
-		for (int i = 0; i < contour.size(); i++)
-		{
-			double l = sqrt((double)CGAL::squared_distance(Point_2(contour[i].x, contour[i].y), Point_2(contour[(i + 1) % contour.size()].x, contour[(i + 1) % contour.size()].y)));
-
-			if (d*total_length >= length&&d*total_length <= length + l)
-			{
-				double ll = (d - length / total_length)*total_length / l;
-				v[0] = contour[i].x + (contour[(i + 1) % contour.size()].x - contour[i].x)*ll;
-				v[1] = contour[i].y + (contour[(i + 1) % contour.size()].y - contour[i].y)*ll;
-				break;
-			}
-			length += l;
-		}
-
-		return v;
-	}
-
-	Vector2d ToolpathGenerator::GetOnePointFromOffset(double d,int offset_index)
-	{
-		assert(d >= 0.0&&d <= 1.0);
-
-		std::vector<Vector2d> contour;
-
-		if (offset_index >= 0 && offset_index <= offsets.size() - 1)
-		{
-			for (int i = 0; i < offsets[offset_index].size(); i++)
-			{
-				contour.push_back(offsets[offset_index][i]);
-			}
-		}
-		else
-		{
-			assert(false);
-		}
-
-		Vector2d v=GetOnePointFromOffset(d,contour);
-		std::vector<Vector2d>().swap(contour);
-		return v;
-
-	}
 
 }
