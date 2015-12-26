@@ -63,8 +63,23 @@ namespace hpcg {
 		}
 		std::string str;
 
-		int work_model = 0;
+		file >> debug_int_0;
+		file >> debug_int_1;
 
+		file >> str;
+		file >> draw_medial_axis;
+
+		file >> str;
+		file >> draw_minimal_points;
+
+		file >> str;
+		file >> draw_maximal_points;
+
+		file >> str;
+		file >> load_path;
+
+		file >> str;
+		file >> draw_entry_exit_spiral;
 
 		file >> str;
 		file >> draw_turning_points;
@@ -103,11 +118,12 @@ namespace hpcg {
 
 		file >> str;
 
-
 		file.clear();
 		file.close();
 		
 		image_space.toolpath_size = toolpath_size;
+
+		OutputPathTwoCircles();
 
 		m_render = render;
 		LoadContour();
@@ -120,7 +136,6 @@ namespace hpcg {
 		}
 
 		double max_double;
-
 	
 		if (abs(contours.bbox().xmax() - contours.bbox().xmin()) >
 			abs(contours.bbox().ymax() - contours.bbox().ymin()))
@@ -132,8 +147,7 @@ namespace hpcg {
 			max_double = abs(contours.bbox().ymax() - contours.bbox().ymin());
 		}
 
-		//toolpath_size = 0.4 / 30.0*max_double;
-
+	
 		//FillingAlgorithm();
 		//FermatSpiral();
 
@@ -144,20 +158,43 @@ namespace hpcg {
 		
 		if (work_model == 2)
 		{
+
+			toolpath_size = 0.4 / 30.0*max_double;
 			ArchinedeanSpiral(contour);
 		}
 
 		if (work_model == 3)
 		{
+
+			toolpath_size = 0.4 / 30.0*max_double;
 			GenerateZigzag();
 		}
 
 		if (work_model == 4)
 		{
-			ArchinedeanSpiralSmooth(contour);
+			toolpath_size = 0.4 / 30.0*max_double;
+			ArchinedeanSpiralTrick(contour);
 		}
 
+		if (work_model == 5)
+		{
+			toolpath_size = 0.4 / 30.0*max_double;
+			GenerateZigzagForCircle();
+		}
+
+		if (work_model == 6)
+		{
+			toolpath_size = 0.4 / 30.0*max_double;
+			ArchinedeanSpiralTrickForCircle(contour);
+		}
+
+		ComputeOffsets_temp();
+		  
 		OutputPath(entry_spiral, str);
+
+		OutputPath(str);
+		
+		//OutputPath(entry_spiral, str);
 		
 		std::vector<Vector2d>().swap(contour);
 	}
@@ -165,8 +202,7 @@ namespace hpcg {
 	void ToolpathGenerator::LoadContour()
 	{
 		//load
-		std::string path = "D:\\task2\\SLAM\\3DprintingFramework\\GenerateTestData\\test.txt";
-		std::ifstream file(path, std::ios::in);
+		std::ifstream file(load_path, std::ios::in);
 		
 		if (!file)
 		{
@@ -329,8 +365,7 @@ namespace hpcg {
 
 		if (draw_entry_exit_spiral)
 		{
-
-			if (true)
+			if (work_model == 2 || work_model == 3 || work_model == 4 || work_model == 5 || work_model == 6)
 			{
 				glLineWidth(line_width);
 				glColor3f(255.0 / 255.0, 42.0 / 255.0, 26.0 / 255.0);
@@ -351,8 +386,6 @@ namespace hpcg {
 				glEnd();
 			}
 	
-
-			if (false)
 			for (int i = 0; i < region.entry_spirals.size(); i++)
 			{
 				glLineWidth(line_width);
@@ -532,18 +565,6 @@ namespace hpcg {
 
 		}
 
-		if (draw_minimal_points)
-		{
-			glPointSize(point_size);
-			glColor3f(0.0, 1.0, 0.0);
-			glBegin(GL_POINTS);
-			for (int i = 0; i < region.sdg.critical_points.size(); i++)
-			{
-				glVertex3f(region.sdg.critical_points[i][0], region.sdg.critical_points[i][1], 0.0);
-			}
-			glEnd();
-		}
-
 
 		if (draw_minimal_points)
 		{
@@ -557,6 +578,17 @@ namespace hpcg {
 			glEnd();
 		}
 
+		if (draw_minimal_points)
+		{
+			glPointSize(point_size);
+			glColor3f(0.0, 1.0, 0.0);
+			glBegin(GL_POINTS);
+			for (int i = 0; i < region.sdg.critical_points.size(); i++)
+			{
+				glVertex3f(region.sdg.critical_points[i][0], region.sdg.critical_points[i][1], 0.0);
+			}
+			glEnd();
+		}
 
 		if (draw_maximal_points)
 		{
@@ -603,7 +635,7 @@ namespace hpcg {
 		if (draw_turning_points)
 		{
 			glPointSize(point_size);
-			glColor3f(2 / 255.0, 126 / 255.0, 18.0 / 255.0);
+			glColor3f(255.0 / 255.0, 255.0 / 255.0, 26.0 / 255.0);
 			glBegin(GL_POINTS);
 			for (int i = 0; i < turning_points_exit.size(); i++)
 			{

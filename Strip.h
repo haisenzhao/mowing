@@ -156,13 +156,17 @@ namespace hpcg {
 		static double GetTotalLength(std::vector<Vector2d> &input_points)
 		{
 			double length = 0.0;
-			for (int i = 0; i < input_points.size() - 1; i++)
+
+			if (input_points.size() >= 2)
 			{
-				length += sqrt((double)CGAL::squared_distance(Point_2(input_points[i].x, input_points[i].y), Point_2(input_points[(i + 1) % input_points.size()].x, input_points[(i + 1) % input_points.size()].y)));
+				for (int i = 0; i < input_points.size() - 1; i++)
+				{
+					length += sqrt((double)CGAL::squared_distance(Point_2(input_points[i].x, input_points[i].y), Point_2(input_points[(i + 1) % input_points.size()].x, input_points[(i + 1) % input_points.size()].y)));
+				}
 			}
+
 			return length;
 		}
-
 
 		static int  CheckSamePoint(Vector2d v, std::vector<Vector2d> &input_points)
 		{
@@ -178,7 +182,6 @@ namespace hpcg {
 			}
 			return index;
 		}
-
 
 		static void SamplingPoints(std::vector<Vector2d> &input_points, double delta, Vector2d v, std::vector<Vector2d> &output_points)
 		{
@@ -238,6 +241,20 @@ namespace hpcg {
 		}
 
 
+		static bool TwoSegmentIntersect(Vector2d v0, Vector2d v1, Vector2d v2, Vector2d v3)
+		{
+			CGAL::Object result = CGAL::intersection(Segment_2(Point_2(v0[0], v0[1]), Point_2(v1[0], v1[1])), Segment_2(Point_2(v2[0], v2[1]), Point_2(v3[0], v3[1])));
+
+			if (const Point_2 *ipoint = CGAL::object_cast<Point_2>(&result))
+			{
+				return true;
+			}
+			else
+			{
+				return false;
+			}
+		}
+
 		static double IntersectPoint(std::vector<Vector2d> &input_points, Vector2d v0, Vector2d v1)
 		{
 			bool b = false;
@@ -266,12 +283,11 @@ namespace hpcg {
 			}
 		}
 
-
-		static double IntersectPoint(std::vector<Vector2d> &input_points, Line_2 line_2)
+		static double IntersectPoint(std::vector<Vector2d> &input_points, Line_2 &line_2)
 		{
 			bool b = false;
 			Vector2d v;
-			for (int i = 0; i < input_points.size() - 1 && !b; i++)
+			for (int i = input_points.size() - 2; i >= 0 && !b; i--)
 			{
 				CGAL::Object result = CGAL::intersection(Segment_2(Point_2(input_points[i][0], input_points[i][1]), Point_2(input_points[i + 1][0], input_points[i + 1][1])),line_2);
 

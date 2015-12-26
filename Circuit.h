@@ -291,10 +291,22 @@ namespace hpcg {
 			return v;
 		}
 
+		static void SelectOnePartOffset(std::vector<Vector2d> &input_points, double d, std::vector<Vector2d> &vecs)
+		{
+			double d1 = d + 0.00001;
+			if (d1 > 1.0)
+				d1 = d1 - 1.0;
+
+			SelectOnePartOffset(input_points, d, d1, vecs);
+			vecs.erase(vecs.begin() + vecs.size() - 1);
+			vecs.push_back(vecs[0]);
+		}
+
 		static void SelectOnePartOffset(std::vector<Vector2d> &input_points, double d0, double d1, std::vector<Vector2d> &vecs)
 		{
 			if (abs(d0 - d1) < 0.0000001)
 			{
+				/*
 				d1 = d0 + 0.00001;
 				if (d1 > 1.0)
 					d1 = d1 - 1.0;
@@ -302,89 +314,92 @@ namespace hpcg {
 				SelectOnePartOffset(input_points, d0, d1, vecs);
 				vecs.erase(vecs.begin() + vecs.size() - 1);
 				vecs.push_back(vecs[0]);
-
-			}
-			else
-			{
-				double total_length = 0.0;
-				for (int i = 0; i < input_points.size(); i++)
-				{
-					total_length += sqrt((double)CGAL::squared_distance(Point_2(input_points[i].x, input_points[i].y), Point_2(input_points[(i + 1) % input_points.size()].x, input_points[(i + 1) % input_points.size()].y)));
-				}
-
-				std::vector<double> vec_ds;
-
-				vec_ds.push_back(0.0);
-				double length = 0.0;
-				for (int i = 0; i < input_points.size(); i++)
-				{
-					length += sqrt((double)CGAL::squared_distance(Point_2(input_points[i].x, input_points[i].y), Point_2(input_points[(i + 1) % input_points.size()].x, input_points[(i + 1) % input_points.size()].y)));
-					vec_ds.push_back(length / total_length);
-				}
+				*/
 
 				Vector2d v = GetOnePointFromOffset(d0, input_points);
 				vecs.push_back(v);
+			}
+			else
+			{
+				Vector2d v = GetOnePointFromOffset(d0, input_points);
+				vecs.push_back(v);
 
-				if (d0 > d1)
+				if (d1 >= 0&&d1<=1.0)
 				{
-					for (int i = vec_ds.size() - 1; i >= 0; i--)
+					double total_length = GetTotalLength(input_points);
+
+					std::vector<double> vec_ds;
+
+					vec_ds.push_back(0.0);
+					double length = 0.0;
+					for (int i = 0; i < input_points.size(); i++)
 					{
-						if (vec_ds[i]<d0&&vec_ds[i]>d1)
-						{
-							v = GetOnePointFromOffset(vec_ds[i], input_points);
-
-							if (!(abs(v[0] - vecs[vecs.size() - 1][0]) < 0.000001&&abs(v[1] - vecs[vecs.size() - 1][1]) < 0.000001))
-							{
-								vecs.push_back(v);
-							}
-						}
-
-						if (vec_ds[i] < d1)
-						{
-							break;
-						}
-					}
-				}
-				else
-				{
-					for (int i = vec_ds.size() - 1; i >0; i--)
-					{
-						if (vec_ds[i] < d0)
-						{
-							v = GetOnePointFromOffset(vec_ds[i], input_points);
-
-							if (!(abs(v[0] - vecs[vecs.size() - 1][0]) < 0.000001&&abs(v[1] - vecs[vecs.size() - 1][1]) < 0.000001))
-							{
-								vecs.push_back(v);
-							}
-						}
+						length += sqrt((double)CGAL::squared_distance(Point_2(input_points[i].x, input_points[i].y), Point_2(input_points[(i + 1) % input_points.size()].x, input_points[(i + 1) % input_points.size()].y)));
+						vec_ds.push_back(length / total_length);
 					}
 
-					for (int i = vec_ds.size() - 1; i >0; i--)
+
+					if (d0 > d1)
 					{
-						if (vec_ds[i] > d1)
+						for (int i = vec_ds.size() - 1; i >= 0; i--)
 						{
-							v = GetOnePointFromOffset(vec_ds[i], input_points);
-							if (!(abs(v[0] - vecs[vecs.size() - 1][0]) < 0.000001&&abs(v[1] - vecs[vecs.size() - 1][1]) < 0.000001))
+							if (vec_ds[i]<d0&&vec_ds[i]>d1)
 							{
-								vecs.push_back(v);
+								v = GetOnePointFromOffset(vec_ds[i], input_points);
+
+								if (!(abs(v[0] - vecs[vecs.size() - 1][0]) < 0.000001&&abs(v[1] - vecs[vecs.size() - 1][1]) < 0.000001))
+								{
+									vecs.push_back(v);
+								}
+							}
+
+							if (vec_ds[i] < d1)
+							{
+								break;
 							}
 						}
 					}
-				}
+					else
+					{
+						for (int i = vec_ds.size() - 1; i >0; i--)
+						{
+							if (vec_ds[i] < d0)
+							{
+								v = GetOnePointFromOffset(vec_ds[i], input_points);
 
-				v = GetOnePointFromOffset(d1, input_points);
-				if (!(abs(v[0] - vecs[vecs.size() - 1][0]) < 0.000001&&abs(v[1] - vecs[vecs.size() - 1][1]) < 0.000001))
-				{
-					vecs.push_back(v);
-				}
+								if (!(abs(v[0] - vecs[vecs.size() - 1][0]) < 0.000001&&abs(v[1] - vecs[vecs.size() - 1][1]) < 0.000001))
+								{
+									vecs.push_back(v);
+								}
+							}
+						}
 
-				if (abs(vecs[1][0] - vecs[0][0]) < 0.000001&&abs(vecs[1][1] - vecs[0][1]) < 0.000001)
-				{
-					vecs.erase(vecs.begin());
-				}
+						for (int i = vec_ds.size() - 1; i >0; i--)
+						{
+							if (vec_ds[i] > d1)
+							{
+								v = GetOnePointFromOffset(vec_ds[i], input_points);
+								if (!(abs(v[0] - vecs[vecs.size() - 1][0]) < 0.000001&&abs(v[1] - vecs[vecs.size() - 1][1]) < 0.000001))
+								{
+									vecs.push_back(v);
+								}
+							}
+						}
+					}
 
-				std::vector<double>().swap(vec_ds);
+					v = GetOnePointFromOffset(d1, input_points);
+					if (!(abs(v[0] - vecs[vecs.size() - 1][0]) < 0.000001&&abs(v[1] - vecs[vecs.size() - 1][1]) < 0.000001))
+					{
+						vecs.push_back(v);
+					}
+
+					if (abs(vecs[1][0] - vecs[0][0]) < 0.000001&&abs(vecs[1][1] - vecs[0][1]) < 0.000001)
+					{
+						vecs.erase(vecs.begin());
+					}
+
+					std::vector<double>().swap(vec_ds);
+				}
 			}
 		}
 
@@ -466,6 +481,23 @@ namespace hpcg {
 
 		}
 
+		static void GenerateOffsetHole(Polygon_with_holes polygon_with_hole, double d, std::vector<std::vector<Vector2d>> &offsets)
+		{
+			PolygonPtrVector offset_polygons = CGAL::create_interior_skeleton_and_offset_polygons_2(d, polygon_with_hole);
+
+			for (PolygonPtrVector::const_iterator pi = offset_polygons.begin(); pi != offset_polygons.end(); ++pi)
+			{
+				std::vector<Vector2d> offset;
+
+				for (Polygon_2::Vertex_const_iterator vi = (**pi).vertices_begin(); vi != (**pi).vertices_end(); ++vi)
+				{
+					offset.push_back(Vector2d((*vi).x(), (*vi).y()));
+				}
+				offsets.push_back(offset);
+				std::vector<Vector2d>().swap(offset);
+			}
+		}
+
 		static void GenerateOffset(std::vector<Vector2d> &input_points, double d, std::vector<std::vector<Vector2d>> &offsets)
 		{
 			Polygon_2 polygon;
@@ -511,6 +543,40 @@ namespace hpcg {
 			vt = GetOnePointFromOffset(d0, offset);
 			std::vector<Vector2d>().swap(offset);
 			return vt;
+		}
+
+		static Line_2 GetRelatedLine(Vector2d v, std::vector<Vector2d> &input_points)
+		{
+			assert(Distance(v, input_points)<0.0001);
+
+			Line_2 line_2;
+
+			int index = Strip::CheckSamePoint(v, input_points);
+
+			if (index >= 0)
+			{
+				Vector2d v1 = input_points[(index + input_points.size() - 1) % input_points.size()];
+				line_2 = Line_2(Point_2(v[0], v[1]), Point_2(v1[0], v1[1]));
+			}
+			else
+			{
+				double d = GetTotalLength(input_points);
+				double par = FindNearestPointPar(v, input_points);
+				double length = 0.0;
+				for (int i = 0; i < input_points.size(); i++)
+				{
+					double l = sqrt((double)CGAL::squared_distance(Point_2(input_points[i].x, input_points[i].y), Point_2(input_points[(i + 1) % input_points.size()].x, input_points[(i + 1) % input_points.size()].y)));
+					if (length / d < par&&par < (length + l) / d)
+					{
+						Vector2d v1 = input_points[(i + input_points.size() - 1) % input_points.size()];
+
+						line_2 = Line_2(Point_2(v[0], v[1]), Point_2(v1[0], v1[1]));
+						break;
+					}
+					length += l;
+				}
+			}
+			return line_2;
 		}
 
 		static Line_2 GetTangent(Vector2d v, std::vector<Vector2d> &input_points)
@@ -559,6 +625,172 @@ namespace hpcg {
 			}
 
 			return line_2;
+		}
+
+		static double DeltaDEuclideanDistance(double d, double distance, std::vector<Vector2d> &input_points)
+		{
+			Vector2d v = Circuit::GetOnePointFromOffset(d, input_points);
+
+			std::vector<Vector2d> vecs;
+
+			int divided_nb = 50;
+			for (int i = 0; i < divided_nb; i++)
+			{
+				Point_2 p0(v[0] + abs(distance)*sin(i * 2 * PI / (double)divided_nb), v[1] + abs(distance)*cos(i * 2 * PI / (double)divided_nb));
+				Point_2 p1(v[0] + abs(distance)*sin((i + 1) * 2 * PI / (double)divided_nb), v[1] + abs(distance)*cos((i + 1) * 2 * PI / (double)divided_nb));
+
+				for (int j = 0; j < input_points.size(); j++)
+				{
+					Point_2 p2(input_points[j].x, input_points[j].y);
+					Point_2 p3(input_points[(j + 1) % input_points.size()].x, input_points[(j + 1) % input_points.size()].y);
+
+					CGAL::Object result = CGAL::intersection(Segment_2(p0, p1), Segment_2(p2, p3));
+
+					if (const Point_2 *ipoint = CGAL::object_cast<Point_2>(&result))
+					{
+						vecs.push_back(Vector2d(ipoint->x(), ipoint->y()));
+					}
+				}
+			}
+
+			if (distance > 0)
+			{
+				for (int i = 0; i < vecs.size(); i++)
+				{
+					double delta_d = Circuit::FindNearestPointPar(vecs[i], input_points);
+
+					if (abs(delta_d - d) > 0.5)
+					{
+						if (delta_d > d)
+						{
+							d = d + 1.0;
+						}
+						else
+						{
+							delta_d = delta_d + 1.0;
+						}
+					}
+
+					if (delta_d > d)
+					{
+						if (delta_d > 1.0)
+							delta_d = delta_d - 1.0;
+
+						std::vector<Vector2d>().swap(vecs);
+						return delta_d;
+					}
+				}
+			}
+			else
+			{
+				for (int i = 0; i < vecs.size(); i++)
+				{
+					double delta_d = Circuit::FindNearestPointPar(vecs[i], input_points);
+
+					if (abs(delta_d - d) > 0.5)
+					{
+						if (delta_d > d)
+						{
+							d = d + 1.0;
+						}
+						else
+						{
+							delta_d = delta_d + 1.0;
+						}
+					}
+
+					if (delta_d < d)
+					{
+						if (delta_d > 1.0)
+							delta_d = delta_d - 1.0;
+
+						std::vector<Vector2d>().swap(vecs);
+						return delta_d;
+					}
+				}
+			}
+
+			std::vector<Vector2d>().swap(vecs);
+			return -1.0;
+		}
+
+		static double DeltaDGeodesicDistance(double d, double distance, std::vector<Vector2d> &input_points)
+		{
+			double total_length = 0.0;
+			for (int i = 0; i < input_points.size(); i++)
+			{
+				total_length += sqrt((double)CGAL::squared_distance(Point_2(input_points[i].x, input_points[i].y), Point_2(input_points[(i + 1) % input_points.size()].x, input_points[(i + 1) % input_points.size()].y)));
+			}
+
+			if (distance > 0)
+			{
+				if (d + distance / total_length < 1.0)
+				{
+					return d + distance / total_length;
+				}
+				else
+				{
+					return d + distance / total_length - 1.0;
+				}
+			}
+			else
+			{
+				if (d + distance / total_length > 0.0)
+				{
+					return d + distance / total_length;
+				}
+				else
+				{
+					return d + distance / total_length + 1.0;
+				}
+			}
+		}
+
+
+		static double Angle(Vector2d a, Vector2d b)
+		{
+			double ab, a1, b1, cosr;
+			ab = a[0] * b[0] + a[1] * b[1];
+			a1 = sqrt(a[0] * a[0] + a[1] * a[1]);
+			b1 = sqrt(b[0] * b[0] + b[1] * b[1]);
+			cosr = ab / a1 / b1;
+			return  acos(cosr);
+		}
+
+		static double ComputeNextTurningPoint_complex(double d, double distance, std::vector<Vector2d> &input_points)
+		{
+			Vector2d v = GetOnePointFromOffset(d, input_points);
+			int index = Strip::CheckSamePoint(v, input_points);
+			if (index >= 0)
+			{
+				Vector2d v0 = input_points[(index + input_points.size() - 1) % input_points.size()];
+				Vector2d v1 = input_points[(index + input_points.size() + 1) % input_points.size()];
+
+				double angle = Angle(Vector2d(v0[0] - v[0], v0[1] - v[1]), Vector2d(v1[0] - v[0], v1[1] - v[1]));
+
+				if (angle >= PI/2.0)
+				{
+					return DeltaDEuclideanDistance(d, distance, input_points);
+				}
+				else
+				{
+					double delta = DeltaDEuclideanDistance(d, distance / sin(angle), input_points);
+
+					if (delta >= 0)
+					{
+						return delta;
+					}
+					else
+					{
+						return DeltaDEuclideanDistance(d, distance, input_points);
+					}
+				}
+			}
+			else
+			{
+				return DeltaDEuclideanDistance(d, distance, input_points);
+			}
+
 		}
 
 	};

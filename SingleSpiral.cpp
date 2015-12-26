@@ -6,6 +6,115 @@
 
 namespace hpcg {
 
+	void ToolpathGenerator::ArchinedeanSpiralTrickForCircle(std::vector<Vector2d> &contour)
+	{
+		ComputeOffsetsForCircle();
+
+		offsets.erase(offsets.begin() + offsets.size()/2.0);
+
+		for (int i = 0; i < offsets.size() - 1; i++)
+		{
+			if (debug_int_0 >= 0)
+			{
+				if (i == debug_int_0)
+					break;
+			}
+
+			Vector2d entry_p_0 = Circuit::GetOnePointFromOffset(entry_d_0, offsets[i]);
+			double entry_d_1 = Circuit::FindNearestPointPar(entry_p_0, offsets[i + 1]);
+			Vector2d entry_p_1 = Circuit::GetOnePointFromOffset(entry_d_1, offsets[i + 1]);
+
+			std::vector<Vector2d> entry_half;
+			Circuit::SelectOnePartOffset(offsets[i], entry_d_0, entry_half);
+
+			double entry_cutting_d = Strip::IntersectPoint(entry_half, Circuit::GetRelatedLine(entry_p_1, offsets[i + 1]));
+
+			double d0 = Circuit::DeltaDEuclideanDistance(entry_d_0, toolpath_size, offsets[i]);
+			Vector2d v = Circuit::GetOnePointFromOffset(d0, offsets[i]);
+			d0 = Strip::FindNearestPointPar(v, entry_half);
+			if (entry_cutting_d>d0)
+			{
+				entry_cutting_d = d0;
+			}
+
+			std::vector<Vector2d> path;
+			Strip::SelectOnePart(entry_half, 0.0, entry_cutting_d, path);
+
+			for (int j = 0; j < path.size(); j++)
+			{
+				entry_spiral.push_back(path[j]);
+			}
+			entry_spiral.push_back(entry_p_1);
+
+			std::vector<Vector2d>().swap(path);
+			std::vector<Vector2d>().swap(entry_half);
+
+			entry_d_0 = entry_d_1;
+		}
+
+		double entry_d_1 = ComputeNextTurningPoint(entry_d_0, toolpath_size*4, offsets.size() - 1);
+
+		Circuit::SelectOnePartOffset(offsets[offsets.size() - 1], entry_d_0, entry_d_1, entry_spiral);
+	}
+
+	void ToolpathGenerator::ArchinedeanSpiralTrick(std::vector<Vector2d> &contour)
+	{
+		for (int i = 0; i <smooth_number; i++)
+			PolygonSmoothing();
+
+		std::vector<Vector2d> contour1;
+
+		for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
+		{
+			contour1.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
+		}
+
+		std::cout << "Contour nb: " << contour1.size() << std::endl;
+
+		ComputeOffsets(contour1);
+
+		for (int i = 0; i < offsets.size() - 1; i++)
+		{
+			Vector2d entry_p_0 = Circuit::GetOnePointFromOffset(entry_d_0, offsets[i]);
+			double entry_d_1 = Circuit::FindNearestPointPar(entry_p_0, offsets[i + 1]);
+			Vector2d entry_p_1 = Circuit::GetOnePointFromOffset(entry_d_1, offsets[i + 1]);
+
+			std::vector<Vector2d> entry_half;
+			Circuit::SelectOnePartOffset(offsets[i], entry_d_0, entry_half);
+
+			double entry_cutting_d = Strip::IntersectPoint(entry_half, Circuit::GetRelatedLine(entry_p_1, offsets[i + 1]));
+
+			double d0 = Circuit::DeltaDEuclideanDistance(entry_d_0, toolpath_size, offsets[i]);
+			Vector2d v = Circuit::GetOnePointFromOffset(d0, offsets[i]);
+			d0 = Strip::FindNearestPointPar(v, entry_half);
+			if (entry_cutting_d>d0)
+			{
+				entry_cutting_d = d0;
+			}
+
+			std::vector<Vector2d> path;
+			Strip::SelectOnePart(entry_half, 0.0, entry_cutting_d, path);
+
+			for (int j = 0; j < path.size(); j++)
+			{
+				entry_spiral.push_back(path[j]);
+			}
+			entry_spiral.push_back(entry_p_1);
+
+
+			std::vector<Vector2d>().swap(path);
+			std::vector<Vector2d>().swap(entry_half);
+
+			entry_d_0 = entry_d_1;
+		}
+
+
+		double entry_d_1 = ComputeNextTurningPoint(entry_d_0, toolpath_size, offsets.size() - 1);
+
+		Circuit::SelectOnePartOffset(offsets[offsets.size() - 1], entry_d_0, entry_d_1, entry_spiral);
+
+	}
+
 	void ToolpathGenerator::ArchinedeanSpiralSmooth(std::vector<Vector2d> &contour)
 	{
 		for (int i = 0; i <smooth_number; i++)

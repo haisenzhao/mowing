@@ -255,6 +255,13 @@ namespace hpcg {
 		int line_width;
 		int point_size;
 
+		int work_model = 0;
+
+		std::string load_path;
+
+		int debug_int_0;
+		int debug_int_1;
+
 	public:
 		
 		bool draw_pixels;
@@ -296,6 +303,8 @@ namespace hpcg {
 		void Init(TMeshProcessor* render);
 		void LoadContour();
 		void ComputeOffsets(std::vector<Vector2d> &contour);
+		void ComputeOffsets_temp();
+		void ComputeOffsetsForCircle();
 
 		void BuildeImageSpace();
 		void StepDebug();
@@ -306,27 +315,31 @@ namespace hpcg {
 
 		//offset fermat spiral
 		void FermatSpiral(std::vector<Vector2d> &contour, Vector2d input_entry_point, Vector2d input_exit_point);
+
 		void FermatsSpiralSmooth(std::vector<Vector2d> &contour, Vector2d input_entry_point, Vector2d input_exit_point);
 		void FermatsSpiralSmooth1(std::vector<Vector2d> &contour, Vector2d input_entry_point, Vector2d input_exit_point);
 		void FermatsSpiralTrick(std::vector<Vector2d> &contour, Vector2d input_entry_point, Vector2d input_exit_point);
 
 		void GenerateZigzag();
+		void GenerateZigzagForCircle();
 		void ArchinedeanSpiral(std::vector<Vector2d> &contour);
 		void ArchinedeanSpiralSmooth(std::vector<Vector2d> &contour);
+		void ArchinedeanSpiralTrick(std::vector<Vector2d> &contour);
+		void ArchinedeanSpiralTrickForCircle(std::vector<Vector2d> &contour);
 
-
-		double DeltaDGeodesicDistance(double d, double distance, std::vector<Vector2d> &contour);
-		double DeltaDEuclideanDistance(double d, double distance, std::vector<Vector2d> &contour);
-		double DeltaDEuclideanDistance(double d, double distance, int offset_index);
 		double ComputeNextTurningPoint(double d, double distance, int offset_index);
 
 		void PolygonSmoothing();
 		void OutputPath(std::vector<Vector2d> &vecs, std::string path);
+		void OutputPath(std::string path);
+		void OutputPathTwoCircles();
 
 		//filling algorithm
 		void FillingAlgorithm();
+		void FillingAlgorithmBasedOnOffsets();
 
 		void GenerateOffsetsForAllPolygons();
+
 
 	};
 } 
