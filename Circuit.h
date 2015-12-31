@@ -23,6 +23,16 @@ namespace hpcg {
 		{
 		}
 
+
+
+		static bool CheckEnclosed(std::vector<Vector2d> &input_points_0, std::vector<Vector2d> &input_points_1)
+		{
+			bool b0 = CheckInside(input_points_0[0], input_points_1);
+			bool b1 = CheckInside(input_points_1[0], input_points_0);
+	
+			return b0 || b1;
+		}
+
 		static bool CheckInside(Vector2d v, std::vector<Vector2d> &input_points)
 		{
 			Polygon_2 poly;
@@ -53,6 +63,38 @@ namespace hpcg {
 				double d = sqrt((double)CGAL::squared_distance(Point_2(v.x, v.y), Segment_2(Point_2(input_points[i].x, input_points[i].y), Point_2(input_points[(i + 1) % input_points.size()].x, input_points[(i + 1) % input_points.size()].y))));
 				m_d = min(m_d, d);
 			}
+			return m_d;
+		}
+
+		static double Distance(Vector2d v0, Vector2d v1, std::vector<Vector2d> &input_points)
+		{
+			double m_d = MAXDOUBLE;
+
+			for (int i = 0; i < input_points.size(); i++)
+			{
+				//double d = sqrt((double)CGAL::squared_distance(Line_2(Point_2(v0.x, v0.y), Point_2(v1.x, v1.y)), Line_2(Point_2(input_points[i].x, input_points[i].y), Point_2(input_points[(i + 1) % input_points.size()].x, input_points[(i + 1) % input_points.size()].y))));
+				double d = sqrt((double)CGAL::squared_distance(Segment_2(Point_2(v0.x, v0.y), Point_2(v1.x, v1.y)), Segment_2(Point_2(input_points[i].x, input_points[i].y), Point_2(input_points[(i + 1) % input_points.size()].x, input_points[(i + 1) % input_points.size()].y))));
+				m_d = min(m_d, d);
+			}
+			return m_d;
+
+		}
+
+		static double Distance(std::vector<Vector2d> &input_points_0, std::vector<Vector2d> &input_points_1)
+		{
+			double m_d = MAXDOUBLE;
+			
+			for (int i = 0; i < input_points_0.size(); i++)
+			{
+				double d = Distance(input_points_0[i], input_points_0[(i + 1) % input_points_0.size()], input_points_1);
+				m_d = min(m_d, d);
+			}
+			for (int i = 0; i < input_points_1.size(); i++)
+			{
+				double d = Distance(input_points_1[i], input_points_1[(i + 1) % input_points_1.size()], input_points_0);
+				m_d = min(m_d, d);
+			}
+
 			return m_d;
 		}
 
@@ -302,6 +344,63 @@ namespace hpcg {
 			vecs.push_back(vecs[0]);
 		}
 
+		static bool compare_double(const double &d0, const double &d1)
+		{
+			return d0 > d1;
+		}
+
+		static void CutACircuit(std::vector<Vector2d> &input_points, std::vector<double> &cutting_points, std::vector<std::vector<Vector2d>> &pathes)
+		{
+			std::vector<double> cutting_points_par;
+			
+			for (int i = 0; i < cutting_points.size(); i = i + 2)
+			{
+				double par = (cutting_points[i] + cutting_points[i + 1]) / 2.0;
+				cutting_points_par.push_back(par);
+			}
+
+			std::sort(cutting_points_par.begin(), cutting_points_par.end(), compare_double);
+
+
+			for (int i = 0; i < cutting_points_par.size(); i++)
+			{
+				double cur_par = cutting_points_par[i];
+				double next_par = cutting_points_par[(i + 1) % cutting_points_par.size()];
+
+				int cur_par_index = -1;
+				int next_par_index = -1;
+				
+				for (int j = 0; j < cutting_points.size() && (cur_par_index<0 || next_par_index<0); j = j + 2)
+				{
+					double par = (cutting_points[j] + cutting_points[j + 1]) / 2.0;
+
+					if (abs(par - cur_par) < 0.00001)
+					{
+						cur_par_index = j;
+					}
+
+					if (abs(par - next_par) < 0.00001)
+					{
+						next_par_index = j;
+					}
+				}
+
+				if (cur_par_index >= 0 && next_par_index >= 0)
+				{
+					//SelectOnePartOffset();
+					std::vector<Vector2d> one_path;
+
+					SelectOnePartOffset(input_points, cutting_points[cur_par_index + 1], cutting_points[next_par_index], one_path);
+
+					pathes.push_back(one_path);
+
+					std::vector<Vector2d>().swap(one_path);
+				}
+
+			}
+
+		}
+
 		static void SelectOnePartOffset(std::vector<Vector2d> &input_points, double d0, double d1, std::vector<Vector2d> &vecs)
 		{
 			if (abs(d0 - d1) < 0.0000001)
@@ -489,10 +588,20 @@ namespace hpcg {
 			{
 				std::vector<Vector2d> offset;
 
+				Polygon_2 poly_2;
+
 				for (Polygon_2::Vertex_const_iterator vi = (**pi).vertices_begin(); vi != (**pi).vertices_end(); ++vi)
 				{
 					offset.push_back(Vector2d((*vi).x(), (*vi).y()));
+					poly_2.push_back(Point_2((*vi).x(), (*vi).y()));
 				}
+
+				if (poly_2.is_clockwise_oriented())
+				{
+					std::reverse(offset.begin(), offset.end());
+				}
+
+
 				offsets.push_back(offset);
 				std::vector<Vector2d>().swap(offset);
 			}
@@ -545,6 +654,51 @@ namespace hpcg {
 			return vt;
 		}
 
+		static Line_2 GetRelatedLine(Vector2d v, std::vector<Vector2d> &input_points, Vector2d &v00, Vector2d &v11 )
+		{
+			assert(Distance(v, input_points)<0.0001);
+
+			Line_2 line_2;
+
+			int index = Strip::CheckSamePoint(v, input_points);
+
+			if (index >= 0)
+			{
+				Vector2d v1 = input_points[(index + input_points.size() - 1) % input_points.size()];
+				line_2 = Line_2(Point_2(v[0], v[1]), Point_2(v1[0], v1[1]));
+
+				v00 = v;
+				v11 = v1;
+			}
+			else
+			{
+				double d = GetTotalLength(input_points);
+				double par = FindNearestPointPar(v, input_points);
+				double length = 0.0;
+				for (int i = 0; i < input_points.size(); i++)
+				{
+					double l = sqrt((double)CGAL::squared_distance(Point_2(input_points[i].x, input_points[i].y), Point_2(input_points[(i + 1) % input_points.size()].x, input_points[(i + 1) % input_points.size()].y)));
+					
+					if (length / d < par&&par < (length + l) / d)
+					{
+						Vector2d v1 = input_points[i];
+						Vector2d v2 = input_points[(i + input_points.size() - 1) % input_points.size()];
+
+						Vector2d v3 = v;
+						v3[0] = v3[0] + v2[0] - v1[0];
+						v3[1] = v3[1] + v2[1] - v1[1];
+
+						line_2 = Line_2(Point_2(v[0], v[1]), Point_2(v3[0], v3[1]));
+
+						v00 = v;
+						v11 = v3;
+						break;
+					}
+					length += l;
+				}
+			}
+			return line_2;
+		}
 		static Line_2 GetRelatedLine(Vector2d v, std::vector<Vector2d> &input_points)
 		{
 			assert(Distance(v, input_points)<0.0001);
@@ -566,11 +720,18 @@ namespace hpcg {
 				for (int i = 0; i < input_points.size(); i++)
 				{
 					double l = sqrt((double)CGAL::squared_distance(Point_2(input_points[i].x, input_points[i].y), Point_2(input_points[(i + 1) % input_points.size()].x, input_points[(i + 1) % input_points.size()].y)));
+
 					if (length / d < par&&par < (length + l) / d)
 					{
-						Vector2d v1 = input_points[(i + input_points.size() - 1) % input_points.size()];
+						Vector2d v1 = input_points[i];
+						Vector2d v2 = input_points[(i + input_points.size() - 1) % input_points.size()];
 
-						line_2 = Line_2(Point_2(v[0], v[1]), Point_2(v1[0], v1[1]));
+						Vector2d v3 = v;
+						v3[0] = v3[0] + v2[0] - v1[0];
+						v3[1] = v3[1] + v2[1] - v1[1];
+
+						line_2 = Line_2(Point_2(v[0], v[1]), Point_2(v3[0], v3[1]));
+
 						break;
 					}
 					length += l;
@@ -757,6 +918,44 @@ namespace hpcg {
 			return  acos(cosr);
 		}
 
+
+		static void ComputeNextEntryExitPoint(double toolpath_size,std::vector<Vector2d> &outside_offset, std::vector<Vector2d> &inside_offset, Vector2d &entry_point, Vector2d &exit_point, Vector2d &next_entry_point, Vector2d &next_exit_point)
+		{
+			//four turning points of the first layer and second layer local_offsets
+			
+			double entry_d_1 = Circuit::FindNearestPointPar(entry_point, inside_offset);
+			double exit_d_1 = Circuit::FindNearestPointPar(exit_point, inside_offset);
+
+			Vector2d entry_p_1 = Circuit::GetOnePointFromOffset(entry_d_1, inside_offset);
+			Vector2d exit_p_1 = Circuit::GetOnePointFromOffset(exit_d_1, inside_offset);
+
+			//handle the case where the next_exit_d_0 and next_entry_d_0 meets each other
+
+			int index_0 = Strip::CheckSamePoint(entry_p_1, inside_offset);
+			int index_1 = Strip::CheckSamePoint(exit_p_1, inside_offset);
+
+			//if (abs(entry_d_1 - exit_d_1) < 0.00001)
+			if (index_0 >= 0 || index_1 >= 0)
+			{
+				Vector2d n_0(entry_point[0] - entry_p_1[0], entry_point[1] - entry_p_1[1]);
+				Vector2d n_1(exit_point[0] - entry_p_1[0], exit_point[1] - entry_p_1[1]);
+
+				if (n_0[0] * n_1[1] - n_0[1] * n_1[0]>0)
+				{
+					exit_d_1 = Circuit::ComputeNextTurningPoint_complex(entry_d_1, toolpath_size, inside_offset);
+				}
+				else
+				{
+					entry_d_1 = Circuit::ComputeNextTurningPoint_complex(exit_d_1, toolpath_size, inside_offset);
+				}
+
+				entry_p_1 = Circuit::GetOnePointFromOffset(entry_d_1, inside_offset);
+				exit_p_1 = Circuit::GetOnePointFromOffset(exit_d_1, inside_offset);
+			}
+			next_entry_point = entry_p_1;
+			next_exit_point = exit_p_1;
+		}
+
 		static double ComputeNextTurningPoint_complex(double d, double distance, std::vector<Vector2d> &input_points)
 		{
 			Vector2d v = GetOnePointFromOffset(d, input_points);
@@ -768,7 +967,8 @@ namespace hpcg {
 
 				double angle = Angle(Vector2d(v0[0] - v[0], v0[1] - v[1]), Vector2d(v1[0] - v[0], v1[1] - v[1]));
 
-				if (angle >= PI/2.0)
+				/*
+				if (angle >= PI / 2.0)
 				{
 					return DeltaDEuclideanDistance(d, distance, input_points);
 				}
@@ -784,6 +984,18 @@ namespace hpcg {
 					{
 						return DeltaDEuclideanDistance(d, distance, input_points);
 					}
+				}
+				*/
+
+				double delta = DeltaDEuclideanDistance(d, distance / sin(angle), input_points);
+
+				if (delta >= 0)
+				{
+					return delta;
+				}
+				else
+				{
+					return DeltaDEuclideanDistance(d, distance, input_points);
 				}
 			}
 			else

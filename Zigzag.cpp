@@ -51,12 +51,12 @@ namespace hpcg {
 
 		file << "2" << std::endl;
 		file << "4" << std::endl;
-		for (int i = 0; i < 60; i++)
+		for (int i = 0; i < 4; i++)
 		{
-			file << 10.0*sin(i * 2 * PI / 60.0 + PI / 4.0) << " " << 10.0*cos(i * 2 * PI / 60.0 + PI / 4.0) << std::endl;
+			file << 10.0*sin(i * 2 * PI / 4 + PI / 4.0) << " " << 10.0*cos(i * 2 * PI / 4 + PI / 4.0) << std::endl;
 		}
-		file << "60" << std::endl;
-		for (int i = 59; i >= 0; i--)
+		file << "6" << std::endl;
+		for (int i = 5; i >= 0; i--)
 		{
 			file << exit_d_0*sin(i * 2 * PI / 60.0) << " " << exit_d_0*cos(i * 2 * PI / 60.0) << std::endl;
 		}

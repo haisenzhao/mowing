@@ -214,7 +214,7 @@ namespace hpcg {
 
 		static void SelectOnePart(std::vector<Vector2d> &input_points, double d0, double d1, std::vector<Vector2d> &vecs)
 		{
-			if (d1 > d0)
+			if (abs(d0 - d1) > 0.00001&&d1 > d0)
 			{
 				vecs.push_back(GetOnePointFromStrip(d0, input_points));
 
@@ -237,6 +237,11 @@ namespace hpcg {
 				{
 					vecs.erase(vecs.begin());
 				}
+			}
+
+			if (abs(d0 - d1) < 0.00001)
+			{
+				vecs.push_back(GetOnePointFromStrip(d0, input_points));
 			}
 		}
 

@@ -316,7 +316,6 @@ namespace hpcg {
 					}
 					maximal_points.push_back(medial_axis_points[i]);
 				}
-
 			}
 
 			if (medial_axis_points_degree[i] == 2 && !medial_axis_points_used[i])

@@ -6,131 +6,6 @@
 
 namespace hpcg {
 
-	void  ToolpathGenerator::ComputeOffsetsForCircle()
-	{
-
-		double lOffset = toolpath_size / 2.0;
-		std::vector<std::vector<Vector2d>> one_pathes;
-		Circuit::GenerateOffsetHole(contours, lOffset, one_pathes);
-
-		std::vector<Vector2d> contour;
-
-		for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
-		{
-			contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
-		}
-
-		while (one_pathes.size() > 0)
-		{
-			std::cout << "Offsets index: " << offsets.size() << std::endl;
-
-			if (one_pathes.size() == 2)
-			{
-				double d0 = Circuit::Distance(one_pathes[0][0], contour);
-				double d1 = Circuit::Distance(one_pathes[1][0], contour);
-				
-				if (d0 < d1)
-				{
-					int insert_index = offsets.size() / 2.0;
-					offsets.insert(offsets.begin() + insert_index, one_pathes[0]);
-
-					std::vector<Vector2d> vecs;
-
-					for (int i = one_pathes[1].size()-1; i >=0; i--)
-					{
-						vecs.push_back(one_pathes[1][i]);
-					}
-					offsets.insert(offsets.begin() + insert_index + 1, vecs);
-					std::vector<Vector2d>().swap(vecs);
-
-				}
-			}
-
-			for (int i = 0; i < one_pathes.size(); i++)
-			{
-				std::vector<Vector2d>().swap(one_pathes[i]);
-			}
-			std::vector<std::vector<Vector2d>>().swap(one_pathes);
-
-			lOffset = lOffset + toolpath_size;
-			Circuit::GenerateOffsetHole(contours, lOffset, one_pathes);
-		}
-
-		std::vector<Vector2d>().swap(contour);
-
-	}
-
-	void ToolpathGenerator::ComputeOffsets_temp()
-	{
-		/*
-		glBegin(GL_LINE_LOOP);
-		for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
-		{
-			glVertex3f(ver_iter->x(), ver_iter->y(), 0.0);
-		}
-		glEnd();
-
-		for (Polygon_with_holes::Hole_iterator hole_iter = contours.holes_begin(); hole_iter != contours.holes_end(); hole_iter++)
-		{
-			glBegin(GL_LINE_LOOP);
-			for (Polygon_2::Vertex_iterator ver_iter = hole_iter->vertices_begin(); ver_iter != hole_iter->vertices_end(); ver_iter++)
-			{
-				glVertex3f(ver_iter->x(), ver_iter->y(), 0.0);
-			}
-			glEnd();
-		}
-		*/
-
-		double lOffset = toolpath_size / 2.0;
-		std::vector<std::vector<Vector2d>> one_pathes;
-		Circuit::GenerateOffsetHole(contours, lOffset, one_pathes);
-
-		while (one_pathes.size() > 0)
-		{
-			std::cout << "Offsets index: " << offsets.size() << std::endl;
-
-			for (int i = 0; i < one_pathes.size(); i++)
-			{
-				offsets.push_back(one_pathes[i]);
-			}
-
-			for (int i = 0; i < one_pathes.size(); i++)
-			{
-				std::vector<Vector2d>().swap(one_pathes[i]);
-			}
-			std::vector<std::vector<Vector2d>>().swap(one_pathes);
-
-			lOffset = lOffset + toolpath_size;
-			Circuit::GenerateOffsetHole(contours, lOffset, one_pathes);
-		}
-
-	}
-
-	void ToolpathGenerator::ComputeOffsets(std::vector<Vector2d> &contour)
-	{
-		double lOffset = toolpath_size / 2.0;
-		std::vector<std::vector<Vector2d>> one_pathes;
-		Circuit::GenerateOffset(contour, lOffset, one_pathes);
-
-		while (one_pathes.size() > 0)
-		{
-			std::cout << "Offsets index: " << offsets.size() << std::endl;
-
-			for (int i = 0; i < one_pathes.size(); i++)
-			{
-				offsets.push_back(one_pathes[i]);
-			}
-
-			for (int i = 0; i < one_pathes.size(); i++)
-			{
-				std::vector<Vector2d>().swap(one_pathes[i]);
-			}
-			std::vector<std::vector<Vector2d>>().swap(one_pathes);
-		
-			lOffset = lOffset + toolpath_size;
-			Circuit::GenerateOffset(contour, lOffset, one_pathes);
-		}
-	}
 
 	bool CompareTwoDouble(double d0, double d1, double d)
 	{
@@ -150,9 +25,222 @@ namespace hpcg {
 		}
 	}
 
+	void ToolpathGenerator::FermatsSpiralTrick(std::vector<std::vector<Vector2d>> &local_offsets, Vector2d input_entry_point, Vector2d input_exit_point)
+	{
+		entry_d_0 = Circuit::FindNearestPointPar(input_entry_point, local_offsets[0]);
+		exit_d_0 = Circuit::FindNearestPointPar(input_exit_point, local_offsets[0]);
+
+		for (int i = 0; i < local_offsets.size() - 1; i++)
+		{
+			if (debug_int_1 != -100)
+			{
+				if (debug_int_1 >= 0)
+				{
+					if (i == debug_int_1)
+					{
+						int dsd = 0;
+						break;
+					}
+				}
+
+				if (debug_int_1 < 0)
+				{
+					if (i == abs(debug_int_1))
+					{
+						int dsd = 0;
+					}
+				}
+			}
+
+			//four turning points of the first layer and second layer local_offsets
+			Vector2d entry_p_0 = Circuit::GetOnePointFromOffset(entry_d_0, local_offsets[i]);
+			Vector2d exit_p_0 = Circuit::GetOnePointFromOffset(exit_d_0, local_offsets[i]);
+			double entry_d_1 = Circuit::FindNearestPointPar(entry_p_0, local_offsets[i + 1]);
+			double exit_d_1 = Circuit::FindNearestPointPar(exit_p_0, local_offsets[i + 1]);
+
+			Vector2d entry_p_1 = Circuit::GetOnePointFromOffset(entry_d_1, local_offsets[i + 1]);
+			Vector2d exit_p_1 = Circuit::GetOnePointFromOffset(exit_d_1, local_offsets[i + 1]);
+
+			//handle the case where the next_exit_d_0 and next_entry_d_0 meets each other
+
+			int index_0 = Strip::CheckSamePoint(entry_p_1, local_offsets[i + 1]);
+			int index_1 = Strip::CheckSamePoint(exit_p_1, local_offsets[i + 1]);
+
+			//if (abs(entry_d_1 - exit_d_1) < 0.00001)
+			if (index_0 >= 0 || index_1>=0)
+			{
+				Vector2d n_0(entry_p_0[0] - entry_p_1[0], entry_p_0[1] - entry_p_1[1]);
+				Vector2d n_1(exit_p_0[0] - entry_p_1[0], exit_p_0[1] - entry_p_1[1]);
+
+				if (n_0[0] * n_1[1] - n_0[1] * n_1[0]>0)
+				{
+					exit_d_1 = Circuit::ComputeNextTurningPoint_complex(entry_d_1, toolpath_size, local_offsets[i + 1]);
+				}
+				else
+				{
+					entry_d_1 = Circuit::ComputeNextTurningPoint_complex(exit_d_1, toolpath_size, local_offsets[i + 1]);
+				}
+
+				entry_p_1 = Circuit::GetOnePointFromOffset(entry_d_1, local_offsets[i + 1]);
+				exit_p_1 = Circuit::GetOnePointFromOffset(exit_d_1, local_offsets[i + 1]);
+			}
+
+
+
+
+			std::vector<Vector2d> entry_half;
+			std::vector<Vector2d> exit_half;
+			Circuit::SelectOnePartOffset(local_offsets[i], entry_d_0, exit_d_0, entry_half);
+			Circuit::SelectOnePartOffset(local_offsets[i], exit_d_0, entry_d_0, exit_half);
+
+			Vector2d vvvv, vvvv1;
+
+			// handle the path (entry_d_0 -> exit_d_0)
+			double entry_cutting_d = Strip::IntersectPoint(entry_half, Circuit::GetRelatedLine(exit_p_1, local_offsets[i + 1], vvvv, vvvv1));
+
+			
+			if (entry_cutting_d < 0)entry_cutting_d = 0.0;
+			//double d0 = Circuit::DeltaDEuclideanDistance(exit_d_0, toolpath_size, local_offsets[i]);
+			double d0 = Circuit::ComputeNextTurningPoint_complex(exit_d_0, toolpath_size, local_offsets[i]);
+
+			Vector2d v = Circuit::GetOnePointFromOffset(d0, local_offsets[i]);
+			d0 = Strip::FindNearestPointPar(v, entry_half);
+			if (entry_cutting_d>d0)
+			{
+				entry_cutting_d = d0;
+			}
+			
+			// handle the path (exit_d_0 -> entry_d_0)
+			double exit_cutting_d = Strip::IntersectPoint(exit_half, Circuit::GetRelatedLine(entry_p_1, local_offsets[i + 1]));
+			if (exit_cutting_d < 0)exit_cutting_d = 0.0;
+			//d0 = Circuit::DeltaDEuclideanDistance(entry_d_0, toolpath_size, local_offsets[i]);
+			d0 = Circuit::ComputeNextTurningPoint_complex(entry_d_0, toolpath_size, local_offsets[i]);
+			v = Circuit::GetOnePointFromOffset(d0, local_offsets[i]);
+			d0 = Strip::FindNearestPointPar(v, exit_half);
+			if (exit_cutting_d>d0)
+			{
+				exit_cutting_d = d0;
+			}
+
+			//inpute data
+			std::vector<Vector2d> path;
+			Strip::SelectOnePart(entry_half, 0.0, entry_cutting_d, path);
+
+			if (i % 2 == 0)
+			{
+				for (int j = 0; j < path.size(); j++)
+				{
+					entry_spiral.push_back(path[j]);
+				}
+				entry_spiral.push_back(exit_p_1);
+			}
+			else
+			{
+				for (int j = 0; j < path.size(); j++)
+				{
+					exit_spiral.push_back(path[j]);
+				}
+				exit_spiral.push_back(exit_p_1);
+			}
+			std::vector<Vector2d>().swap(path);
+
+			//inpute data
+			Strip::SelectOnePart(exit_half, 0.0, exit_cutting_d, path);
+			if (i % 2 == 0)
+			{
+				for (int j = 0; j < path.size(); j++)
+				{
+					exit_spiral.push_back(path[j]);
+				}
+				exit_spiral.push_back(entry_p_1);
+			}
+			else
+			{
+				for (int j = 0; j < path.size(); j++)
+				{
+					entry_spiral.push_back(path[j]);
+				}
+				entry_spiral.push_back(entry_p_1);
+			}
+
+			std::vector<Vector2d>().swap(path);
+			std::vector<Vector2d>().swap(entry_half);
+			std::vector<Vector2d>().swap(exit_half);
+
+			entry_d_0 = entry_d_1;
+			exit_d_0 = exit_d_1;
+		}
+
+		if (debug_int_1 != -100)
+		{
+			return;
+		}
+
+		//final offset
+		#pragma region final_offset
+		std::vector<Vector2d> vecs0, vecs1;
+		Circuit::SelectOnePartOffset(local_offsets[local_offsets.size() - 1], entry_d_0, exit_d_0, vecs0);
+		Circuit::SelectOnePartOffset(local_offsets[local_offsets.size() - 1], exit_d_0, entry_d_0, vecs1);
+
+
+		Vector2d entry_p_0 = Circuit::GetOnePointFromOffset(entry_d_0, local_offsets[local_offsets.size() - 1]);
+		Vector2d exit_p_0 = Circuit::GetOnePointFromOffset(exit_d_0, local_offsets[local_offsets.size() - 1]);
+
+		double entry_d_1 = Circuit::ComputeNextTurningPoint_complex(exit_d_0, toolpath_size, local_offsets[local_offsets.size() - 1]);
+		double exit_d_1 = Circuit::ComputeNextTurningPoint_complex(entry_d_0, toolpath_size, local_offsets[local_offsets.size() - 1]);
+
+		Vector2d entry_p_1 = Circuit::GetOnePointFromOffset(entry_d_1, local_offsets[local_offsets.size() - 1]);
+		Vector2d exit_p_1 = Circuit::GetOnePointFromOffset(exit_d_1, local_offsets[local_offsets.size() - 1]);
+
+		if ((local_offsets.size() - 1) % 2 == 0)
+		{
+			if (Strip::GetTotalLength(vecs0) > Strip::GetTotalLength(vecs1))
+			{
+				for (int i = 1; i < vecs0.size() - 1; i++)
+				{
+					entry_spiral.push_back(vecs0[i]);
+				}
+				entry_spiral.push_back(entry_p_1);
+			}
+			else
+			{
+				for (int i = 1; i < vecs1.size() - 1; i++)
+				{
+					exit_spiral.push_back(vecs1[i]);
+				}
+				exit_spiral.push_back(exit_p_1);
+
+			}
+		}
+		else
+		{
+			if (Strip::GetTotalLength(vecs0) > Strip::GetTotalLength(vecs1))
+			{
+				for (int i = 1; i < vecs0.size() - 1; i++)
+				{
+					exit_spiral.push_back(vecs0[i]);
+				}
+				exit_spiral.push_back(exit_p_1);
+			}
+			else
+			{
+				for (int i = 1; i < vecs1.size() - 1; i++)
+				{
+					entry_spiral.push_back(vecs1[i]);
+				}
+				entry_spiral.push_back(entry_p_1);
+			}
+		}
+
+		std::vector<Vector2d>().swap(vecs0);
+		std::vector<Vector2d>().swap(vecs1);
+		#pragma endregion
+
+	}
+
 	void ToolpathGenerator::FermatsSpiralTrick(std::vector<Vector2d> &contour, Vector2d input_entry_point, Vector2d input_exit_point)
 	{
-		ComputeOffsets(contour);
+		//ComputeOffsets(contour);
 
 		entry_d_0 = Circuit::FindNearestPointPar(input_entry_point, offsets[0]);
 		exit_d_0 = Circuit::FindNearestPointPar(input_exit_point, offsets[0]);
@@ -206,7 +294,6 @@ namespace hpcg {
 				entry_p_1 = Circuit::GetOnePointFromOffset(entry_d_1, offsets[i + 1]);
 				exit_p_1 = Circuit::GetOnePointFromOffset(exit_d_1, offsets[i + 1]);
 			}
-
 
 
 			std::vector<Vector2d> entry_half;
@@ -877,10 +964,6 @@ namespace hpcg {
 		*/
 
 	}
-
-
-
-
 
 	double ToolpathGenerator::ComputeNextTurningPoint(double d, double distance, int offset_index)
 	{

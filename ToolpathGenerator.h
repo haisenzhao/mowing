@@ -247,6 +247,11 @@ namespace hpcg {
 		
 		Polygon_with_holes contours;
 		std::vector<std::vector<Vector2d>> offsets;
+		std::vector<std::vector<std::vector<Vector2d>>> offsetses;
+		std::vector<int> offset_graph;
+		std::vector<int> offset_degree;
+		std::vector<std::vector<int>> decompose_offset;
+
 		ImageSpace image_space;
 
 		double toolpath_size;
@@ -289,15 +294,21 @@ namespace hpcg {
 		std::vector<Vector2d> entry_spiral;
 		std::vector<Vector2d> exit_spiral;
 
+		std::vector<std::vector<Vector2d>> entry_spirals;
+		std::vector<std::vector<Vector2d>> exit_spirals;
 
+		std::vector<std::vector<Vector2d>> pathes;
 
 		std::vector<Vector2d> turning_points_entry;
 		std::vector<Vector2d> turning_points_exit;
 		double entry_d_0;
 		double exit_d_0;
 
-
 		std::vector<Vector2d> aaaa;
+
+
+
+
 
 		ToolpathGenerator();
 		void Init(TMeshProcessor* render);
@@ -319,6 +330,7 @@ namespace hpcg {
 		void FermatsSpiralSmooth(std::vector<Vector2d> &contour, Vector2d input_entry_point, Vector2d input_exit_point);
 		void FermatsSpiralSmooth1(std::vector<Vector2d> &contour, Vector2d input_entry_point, Vector2d input_exit_point);
 		void FermatsSpiralTrick(std::vector<Vector2d> &contour, Vector2d input_entry_point, Vector2d input_exit_point);
+		void FermatsSpiralTrick(std::vector<std::vector<Vector2d>> &local_offsets, Vector2d input_entry_point, Vector2d input_exit_point);
 
 		void GenerateZigzag();
 		void GenerateZigzagForCircle();
@@ -340,6 +352,11 @@ namespace hpcg {
 
 		void GenerateOffsetsForAllPolygons();
 
+		void Output_tree(std::string path);
+		void Output_tree(std::vector<int> &nodes, std::vector<int> &edges, std::string path);
+
+		void DetectEntryExitPoints(std::vector<Vector2d> &outside_offset, std::vector<Vector2d> &inside_offset, Vector2d &outside_entry_point, Vector2d &outside_exit_point, Vector2d &inside_entry_point, Vector2d &inside_exit_point);
+		//void DetectEntryExitPoints(std::vector<Vector2d> &offset_0, std::vector<Vector2d> &offset_1, Vector2d &entry_point, Vector2d &exit_point, Vector2d &next_entry_point, Vector2d &next_exit_point);
 
 	};
 } 
