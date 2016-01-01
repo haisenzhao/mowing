@@ -214,8 +214,6 @@ namespace hpcg {
 		double entry_point_d = Circuit::ComputeNextTurningPoint_complex(d, toolpath_size, inside_offset);
 		inside_exit_point = Circuit::GetOnePointFromOffset(entry_point_d, inside_offset);
 
-		//Circuit::ComputeNextEntryExitPoint(toolpath_size, outside_offset, inside_offset, outside_entry_point, outside_exit_point, inside_entry_point, inside_exit_point);
-
 		double outside_entry_d = Circuit::FindNearestPointPar(inside_entry_point, outside_offset);
 		double outside_exit_d = Circuit::FindNearestPointPar(inside_exit_point, outside_offset);
 
@@ -333,49 +331,55 @@ namespace hpcg {
 
 			if (decompose_offset[i][0] == 0)
 			{
+				//get current offsets
 				std::vector<std::vector<Vector2d>> offsets0;
-
 				for (int l = 0; l < decompose_offset[i].size(); l++)
 				{
 					offsets0.push_back(offsets[decompose_offset[i][l]]);
 				}
+				int next_index = Tree::NextNode(mst, decompose_offset[i]);
 
-				Vector2d inside_entry_point;
-				Vector2d inside_exit_point;
-				Vector2d outside_entry_point;
-				Vector2d outside_exit_point;
+				Vector2d entry_point;
+				Vector2d exit_point;
+				Vector2d v0, v1;
+				DetectEntryExitPoints(offsets[decompose_offset[i][1]], offsets[decompose_offset[i][0]], v0, v1, entry_point, exit_point);
 
-				DetectEntryExitPoints(offsets[decompose_offset[i][1]], offsets[decompose_offset[i][0]], outside_entry_point, outside_exit_point, inside_entry_point, inside_exit_point);
-
-				FermatsSpiralTrick(offsets0, inside_entry_point, inside_exit_point);
-
-				std::vector<std::vector<Vector2d>>().swap(offsets0);
+				//generate Fermat spiral
+				FermatsSpiralTrick(offsets0, entry_point, exit_point);
 
 				entry_spirals.push_back(entry_spiral);
 				exit_spirals.push_back(exit_spiral);
 
-				int next_index = Tree::NextNode(mst, decompose_offset[i]);
 
+				//get connecting points
 				double entry_d = Circuit::FindNearestPointPar(entry_spiral[entry_spiral.size()-1],offsets[next_index]);
-				outside_entry_point = Circuit::GetOnePointFromOffset(entry_d, offsets[next_index]);
+				Vector2d connecting_entry_point = Circuit::GetOnePointFromOffset(entry_d, offsets[next_index]);
 
 				double exit_d = Circuit::FindNearestPointPar(exit_spiral[exit_spiral.size()-1],offsets[next_index]);
-				outside_exit_point = Circuit::GetOnePointFromOffset(exit_d,offsets[next_index]);
+				Vector2d connecting_exit_point = Circuit::GetOnePointFromOffset(exit_d, offsets[next_index]);
 
-				turning_points_entry.push_back(outside_entry_point);
-				turning_points_exit.push_back(outside_exit_point);
+				turning_points_entry.push_back(connecting_entry_point);
+				turning_points_exit.push_back(connecting_exit_point);
 
-				//turning_points_entry.push_back(entry_spiral[entry_spiral.size() - 1]);
-				//turning_points_entry.push_back(exit_spiral[exit_spiral.size() - 1]);
+				//inpute connecting lines
+				std::vector<Vector2d> one_path;
+				one_path.push_back(connecting_entry_point);
+				one_path.push_back(entry_spiral[entry_spiral.size() - 1]);
+				pathes.push_back(one_path);
+				std::vector<Vector2d>().swap(one_path);
+				one_path.push_back(connecting_exit_point);
+				one_path.push_back(exit_spiral[exit_spiral.size() - 1]);
+				pathes.push_back(one_path);
+				std::vector<Vector2d>().swap(one_path);
 
+
+				//input cutting points
 				Tree::InputCuttingPoints(connect_nodes, cutting_points, next_index, entry_d, exit_d);
 				
-				//static void InputCuttingPoints(std::vector<int> &nodes, std::vector<std::vector<double>> &cutting_points, int node_id, double cutting_points_0, double cutting_points_1)
-
-				///input
+				std::vector<std::vector<Vector2d>>().swap(offsets0);
 				std::vector<Vector2d>().swap(entry_spiral);
 				std::vector<Vector2d>().swap(exit_spiral);
-	
+
 			}
 			else
 			{
@@ -388,41 +392,46 @@ namespace hpcg {
 
 				int next_index = Tree::NextNode(mst, decompose_offset[i]);
 
-				Vector2d inside_entry_point;
-				Vector2d inside_exit_point;
-				Vector2d outside_entry_point;
-				Vector2d outside_exit_point;
-				DetectEntryExitPoints(offsets[next_index], offsets[decompose_offset[i][decompose_offset[i].size() - 1]], outside_entry_point, outside_exit_point, inside_entry_point, inside_exit_point);
+				Vector2d entry_point;
+				Vector2d exit_point;
+				Vector2d connecting_entry_point;
+				Vector2d connecting_exit_point;
+				DetectEntryExitPoints(offsets[next_index], offsets[decompose_offset[i][decompose_offset[i].size() - 1]], connecting_entry_point, connecting_exit_point, entry_point, exit_point);
 
-				double entry_d = Circuit::FindNearestPointPar(outside_entry_point, offsets[next_index]);
-				double exit_d = Circuit::FindNearestPointPar(outside_exit_point, offsets[next_index]);
+				double entry_d = Circuit::FindNearestPointPar(connecting_entry_point, offsets[next_index]);
+				double exit_d = Circuit::FindNearestPointPar(connecting_exit_point, offsets[next_index]);
 
+				//input cutting points
 				bool b = Circuit::CheckEnclosed(offsets[next_index], offsets[decompose_offset[i][decompose_offset[i].size() - 1]]);
-
 				if (b)
 				{
 					Tree::InputCuttingPoints(connect_nodes, cutting_points, next_index, exit_d, entry_d);
 
-					turning_points_entry.push_back(outside_exit_point);
-					turning_points_exit.push_back(outside_entry_point);
+					turning_points_entry.push_back(connecting_exit_point);
+					turning_points_exit.push_back(connecting_entry_point);
 				}
 				else
 				{
 					Tree::InputCuttingPoints(connect_nodes, cutting_points, next_index, entry_d, exit_d);
 
-					turning_points_entry.push_back(outside_entry_point);
-					turning_points_exit.push_back(outside_exit_point);
+					turning_points_entry.push_back(connecting_entry_point);
+					turning_points_exit.push_back(connecting_exit_point);
 				}
 
+				//inpute connecting lines
+				std::vector<Vector2d> one_path;
+				one_path.push_back(connecting_entry_point);
+				one_path.push_back(entry_point);
+				pathes.push_back(one_path);
+				std::vector<Vector2d>().swap(one_path);
+				one_path.push_back(connecting_exit_point);
+				one_path.push_back(exit_point);
+				pathes.push_back(one_path);
+				std::vector<Vector2d>().swap(one_path);
 
 
-				//turning_points_entry.push_back(inside_entry_point);
-				//turning_points_entry.push_back(inside_exit_point);
-
-				//turning_points_entry.push_back(entry_point);
-				//turning_points_exit.push_back(exit_point);
-
-				FermatsSpiralTrick(offsets0, inside_entry_point, inside_exit_point);
+				//generate Fermat spiral
+				FermatsSpiralTrick(offsets0, entry_point, exit_point);
 				std::vector<std::vector<Vector2d>>().swap(offsets0);
 
 				entry_spirals.push_back(entry_spiral);
@@ -435,25 +444,45 @@ namespace hpcg {
 
 		//connect sub-region to offset mst tree
 
-		for (int i = 0; i < connect_nodes.size(); i++)
+		for (int i = 1; i < connect_nodes.size(); i++)
 		{
-			//connect_edges_cutting_points
-
 			Circuit::CutACircuit(offsets[connect_nodes[i]], cutting_points[i], pathes);
-			
-			//static void CutACircuit(std::vector<Vector2d> &input_points, std::vector<double> &cutting_points, std::vector<std::vector<Vector2d>> &pathes)
 		}
 
-		for (int i = 0; i < connect_edges.size(); i=i+2)
+		for (int i = 2; i < connect_edges.size(); i=i+2)
 		{
 			//connect_edges[i]
 			//connect_edges[i+1]
+
+			int node_index_0 = connect_edges[i];
+			int node_index_1 = connect_edges[i + 1];
+
+			int cutting_index_0 = -1;
+			int cutting_index_1 = -1;
+
+			for (int j = 0; j < connect_nodes.size() && (cutting_index_0<0 || cutting_index_1<0); j++)
+			{
+				if (connect_nodes[j] == node_index_0)
+				{
+					cutting_index_0 = j;
+				}
+
+				if (connect_nodes[j] = node_index_1)
+				{
+					cutting_index_1 = j;
+				}
+			}
+
+			if (cutting_index_0 >= 0 && cutting_index_1 >= 0)
+			{
+				Circuit::ConnectTwoTrunkNodes(toolpath_size, offsets[node_index_0], offsets[node_index_1],
+					cutting_points[cutting_index_0], cutting_points[cutting_index_1], pathes_temp, turning_points_entry_temp, turning_points_exit_temp);
+			}
+
+			//cutting_points[node_index_0]
+			//cutting_points[node_index_1]
 			//offsets
-
-
-
 		}
-
 
 
 		std::vector<int>().swap(connect_edges);

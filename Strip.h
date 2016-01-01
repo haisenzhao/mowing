@@ -153,6 +153,18 @@ namespace hpcg {
 			return std::sqrt((v0[0] - v1[0])*(v0[0] - v1[0]) + (v0[1] - v1[1])*(v0[1] - v1[1]));
 		}
 
+		static double Distance(Vector2d v, std::vector<Vector2d> &input_points)
+		{
+			double m_d = MAXDOUBLE;
+			for (int i = 0; i < input_points.size()-1; i++)
+			{
+				double d = sqrt((double)CGAL::squared_distance(Point_2(v.x, v.y), Segment_2(Point_2(input_points[i].x, input_points[i].y), Point_2(input_points[(i + 1) % input_points.size()].x, input_points[(i + 1) % input_points.size()].y))));
+				m_d = min(m_d, d);
+			}
+			return m_d;
+		}
+
+
 		static double GetTotalLength(std::vector<Vector2d> &input_points)
 		{
 			double length = 0.0;
@@ -245,7 +257,6 @@ namespace hpcg {
 			}
 		}
 
-
 		static bool TwoSegmentIntersect(Vector2d v0, Vector2d v1, Vector2d v2, Vector2d v3)
 		{
 			CGAL::Object result = CGAL::intersection(Segment_2(Point_2(v0[0], v0[1]), Point_2(v1[0], v1[1])), Segment_2(Point_2(v2[0], v2[1]), Point_2(v3[0], v3[1])));
@@ -313,7 +324,6 @@ namespace hpcg {
 				return -1.0;
 			}
 		}
-
 
 	};
 

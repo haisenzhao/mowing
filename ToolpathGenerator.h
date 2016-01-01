@@ -298,9 +298,14 @@ namespace hpcg {
 		std::vector<std::vector<Vector2d>> exit_spirals;
 
 		std::vector<std::vector<Vector2d>> pathes;
+		std::vector<std::vector<Vector2d>> pathes_temp;
 
 		std::vector<Vector2d> turning_points_entry;
 		std::vector<Vector2d> turning_points_exit;
+
+		std::vector<Vector2d> turning_points_entry_temp;
+		std::vector<Vector2d> turning_points_exit_temp;
+
 		double entry_d_0;
 		double exit_d_0;
 

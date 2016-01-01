@@ -86,8 +86,6 @@ namespace hpcg {
 			}
 
 
-
-
 			std::vector<Vector2d> entry_half;
 			std::vector<Vector2d> exit_half;
 			Circuit::SelectOnePartOffset(local_offsets[i], entry_d_0, exit_d_0, entry_half);

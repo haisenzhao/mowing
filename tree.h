@@ -222,6 +222,9 @@ namespace hpcg {
 							*/
 
 							//one_path.push_back(next_index);
+
+							//one_path.push_back(next_index);
+							//node_used[next_index] = true;
 							break;
 						}
 						start_index = next_index;
@@ -299,6 +302,33 @@ namespace hpcg {
 				{
 					related_int.push_back(edges[i]);
 				}
+			}
+		}
+
+		//node_index_1->node_index_0->????
+		static int NextNode(std::vector<int> &edges, int node_index_0, int node_index_1)
+		{
+			int int_index = -1;
+			std::vector<int> related_int;
+			NextNode(edges, node_index_0, related_int);
+
+			if (related_int.size() == 2)
+			{
+				if (related_int[0] == node_index_1)
+				{
+					int_index = related_int[1];
+				}
+				else
+				{
+					int_index = related_int[0];
+				}
+				std::vector<int>().swap(related_int);
+
+				return int_index;
+			}
+			else
+			{
+				return related_int[0];
 			}
 		}
 

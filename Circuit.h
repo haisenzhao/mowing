@@ -547,6 +547,39 @@ namespace hpcg {
 			}
 		}
 
+		static void GenerateOffsetForOutside(std::vector<Vector2d> &input_points, double d, std::vector<Vector2d> &offset)
+		{
+			Polygon_2 polygon;
+
+			for (int i = 0; i < input_points.size(); i++)
+			{
+				polygon.push_back(Point_2(input_points[i][0], input_points[i][1]));
+			}
+
+			if (polygon.is_simple())
+			{
+				if (!polygon.is_clockwise_oriented())
+				{
+					polygon.reverse_orientation();
+				}
+
+				PolygonPtrVector offset_polygons = CGAL::create_interior_skeleton_and_offset_polygons_2(d, polygon);
+
+				for (PolygonPtrVector::const_iterator pi = offset_polygons.begin(); pi != offset_polygons.end(); ++pi)
+				{
+					for (Polygon_2::Vertex_const_iterator vi = (**pi).vertices_begin(); vi != (**pi).vertices_end(); ++vi)
+					{
+						offset.push_back(Vector2d((*vi).x(), (*vi).y()));
+					}
+				}
+			}
+			else
+			{
+				assert(false);
+			}
+
+		}
+
 		static void GenerateOffset(std::vector<Vector2d> &input_points, double d, std::vector<Vector2d> &offset)
 		{
 			Polygon_2 polygon;
@@ -907,7 +940,6 @@ namespace hpcg {
 			}
 		}
 
-
 		static double Angle(Vector2d a, Vector2d b)
 		{
 			double ab, a1, b1, cosr;
@@ -917,7 +949,6 @@ namespace hpcg {
 			cosr = ab / a1 / b1;
 			return  acos(cosr);
 		}
-
 
 		static void ComputeNextEntryExitPoint(double toolpath_size,std::vector<Vector2d> &outside_offset, std::vector<Vector2d> &inside_offset, Vector2d &entry_point, Vector2d &exit_point, Vector2d &next_entry_point, Vector2d &next_exit_point)
 		{
@@ -1003,6 +1034,161 @@ namespace hpcg {
 				return DeltaDEuclideanDistance(d, distance, input_points);
 			}
 
+		}
+
+		static bool SharingPart(std::vector<Vector2d> &main_offset, std::vector<Vector2d> &check_offset, double &offset_start, double &offset_end, std::vector<std::vector<Vector2d>> &pathes_temp)
+		{
+			int index = -1;
+
+			for (int i = 0; i < main_offset.size(); i++)
+			{
+				double d0 = Distance(main_offset[i], check_offset);
+				double d1 = Distance(main_offset[(i + 1) % main_offset.size()], check_offset);
+
+				if (d0 > 0.00001&&d1<0.00001)
+				{
+					index = (i + 1) % main_offset.size();
+					break;
+				}
+			}
+
+
+
+			if (index < 0)
+			{
+				offset_start = 0.0;
+				offset_end = 1.0;
+				return true;
+			}
+
+			offset_start = FindNearestPointPar(main_offset[index], main_offset);
+
+			int i = (index + 1) % main_offset.size();
+			do
+			{
+				double d = Distance(main_offset[i], check_offset);
+
+				if (d > 0.00001||i==index)
+				{
+					break;
+				}
+				i = (i + 1) % main_offset.size();
+			} while (true);
+			
+			i = (i + main_offset.size()- 1) % main_offset.size();
+
+			offset_end = FindNearestPointPar(main_offset[i], main_offset);
+
+			return false;
+		}
+
+		static void DetectSharingPartEnclose(double toolpath_size, std::vector<Vector2d> &outside_offset, std::vector<Vector2d> &inside_offset,
+			double &outside_offset_start, double &outside_offset_end, double &inside_offset_start, double &inside_offset_end, std::vector<std::vector<Vector2d>> &pathes_temp)
+		{
+			std::vector<Vector2d> offset;
+			GenerateOffset(outside_offset, toolpath_size, offset);
+
+			bool b = SharingPart(inside_offset, offset, inside_offset_start, inside_offset_end, pathes_temp);
+
+			if (b)
+			{
+				outside_offset_start = 0.0;
+				outside_offset_end = 1.0;
+			}
+			else
+			{
+				Vector2d v0 = GetOnePointFromOffset(inside_offset_start, inside_offset);
+				Vector2d v1 = GetOnePointFromOffset(inside_offset_end, inside_offset);
+
+				outside_offset_start = FindNearestPointPar(v0,outside_offset);
+				outside_offset_end = FindNearestPointPar(v1, outside_offset);
+			}
+
+			std::vector<Vector2d>().swap(offset);
+		}
+
+		static void DetectSharingPart(double toolpath_size, std::vector<Vector2d> &offset_0, std::vector<Vector2d> &offset_1,
+			double &offset_0_start, double &offset_0_end, double &offset_1_start, double &offset_1_end, std::vector<std::vector<Vector2d>> &pathes_temp)
+		{
+			bool b0 = CheckInside(offset_0[0], offset_1);
+			bool b1 = CheckInside(offset_1[0], offset_0);
+
+			if (b0)
+			{
+				DetectSharingPartEnclose(toolpath_size, offset_1, offset_0, offset_1_start, offset_1_end, offset_0_start, offset_0_end, pathes_temp);
+			}
+
+			if (b1)
+			{
+				DetectSharingPartEnclose(toolpath_size, offset_0, offset_1, offset_0_start, offset_0_end, offset_1_start, offset_1_end, pathes_temp);
+			}
+
+			if (!b0&&!b1)
+			{
+				std::vector<Vector2d> offset;
+				GenerateOffsetForOutside(offset_0, toolpath_size, offset);
+
+				bool b = SharingPart(offset_1, offset, offset_1_start, offset_1_end, pathes_temp);
+
+				Vector2d v0 = GetOnePointFromOffset(offset_1_start, offset_1);
+				Vector2d v1 = GetOnePointFromOffset(offset_1_end, offset_1);
+
+				offset_0_start = FindNearestPointPar(v0, offset_0);
+				offset_0_end = FindNearestPointPar(v1, offset_0);
+
+				std::vector<Vector2d>().swap(offset);
+			}
+		}
+
+		static void ConnectTwoTrunkNodes(double toolpath_size, std::vector<Vector2d> &offset0, std::vector<Vector2d> &offset1,
+			std::vector<double> &cutting_points_0, std::vector<double> &cutting_points_1, std::vector<std::vector<Vector2d>> &pathes_temp, std::vector<Vector2d> &turning_points_entry_temp, std::vector<Vector2d> &turning_points_exit_temp)
+		{
+			double offset_0_start;
+			double offset_0_end;
+			double offset_1_start;
+			double offset_1_end;
+
+			DetectSharingPart(toolpath_size, offset0, offset1, offset_0_start, offset_0_end, offset_1_start, offset_1_end, pathes_temp);
+
+
+			std::vector<Vector2d> offset_0_path;
+			SelectOnePartOffset(offset0, offset_0_end, offset_0_start, offset_0_path);
+			pathes_temp.push_back(offset_0_path);
+	
+			std::vector<Vector2d> offset_1_path;
+			SelectOnePartOffset(offset1, offset_1_end, offset_1_start, offset_1_path);
+			pathes_temp.push_back(offset_1_path);
+
+
+			for (int i = 0; i < cutting_points_0.size(); i = i + 2)
+			{
+				double d0 = cutting_points_0[i];
+				double d1 = cutting_points_0[i+1];
+
+				double d00 = DeltaDEuclideanDistance(d0, toolpath_size, offset0);
+
+				Vector2d v0 = GetOnePointFromOffset(d0, offset0);
+				Vector2d v1 = GetOnePointFromOffset(d1, offset0);
+
+				Vector2d v00 = GetOnePointFromOffset(d00, offset0);
+
+				
+				d0 = Strip::Distance(v0, offset_0_path);
+				d1 = Strip::Distance(v1, offset_0_path);
+
+				if (d0 < 0.00001&&d1 < 0.00001)
+				{
+					Vector2d next_entry_point;
+					Vector2d next_exit_point;
+
+					ComputeNextEntryExitPoint(toolpath_size, offset0, offset1, v0, v00, next_entry_point, next_exit_point);
+					turning_points_entry_temp.push_back(next_entry_point);
+					turning_points_exit_temp.push_back(next_exit_point);
+				}
+			}
+
+			std::vector<Vector2d>().swap(offset_0_path);
+			std::vector<Vector2d>().swap(offset_1_path);
 		}
 
 	};

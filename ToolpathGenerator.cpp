@@ -180,7 +180,9 @@ namespace hpcg {
 
 		if (work_model == 4)
 		{
-			toolpath_size = 0.4 / 30.0*max_double;
+			//toolpath_size = 0.4 / 30.0*max_double;
+			toolpath_size =0.4 / 30.0*max_double;
+			
 			ArchinedeanSpiralTrick(contour);
 		}
 
@@ -203,7 +205,7 @@ namespace hpcg {
 
 		//ComputeOffsets_temp();
 		  
-		//OutputPath(entry_spiral, str);
+		OutputPath(entry_spiral, str);
 
 		//OutputPath(str);
 		
@@ -381,9 +383,6 @@ namespace hpcg {
 
 				}
 			}
-
-
-
 		}
 
 		//draw axis
@@ -455,10 +454,12 @@ namespace hpcg {
 						glEnd();
 					}
 				}
-
+				
 				//pathes
+				if (true)
 				for (int i = 0; i < pathes.size(); i++)
 				{
+
 					glLineWidth(line_width);
 					glColor3f(2 / 255.0, 126 / 255.0, 18.0 / 255.0);
 					glBegin(GL_LINE_STRIP);
@@ -468,6 +469,22 @@ namespace hpcg {
 					}
 					glEnd();
 				}
+
+				//pathes_temp
+				if (iiiiii%2==1)
+					for (int i = 0; i < pathes_temp.size(); i++)
+					{
+
+						glLineWidth(line_width);
+						glColor3f(1.0,0.0,0.0);
+						glBegin(GL_LINE_STRIP);
+						for (int j = 0; j < pathes_temp[i].size(); j++)
+						{
+							glVertex3f(pathes_temp[i][j][0], pathes_temp[i][j][1], 0.0);
+						}
+						glEnd();
+					}
+
 			}
 
 	
@@ -736,6 +753,27 @@ namespace hpcg {
 				glVertex3f(turning_points_entry[i][0], turning_points_entry[i][1], 0.0);
 			}
 			glEnd();
+
+
+			glPointSize(point_size);
+			glColor3f(0.0, 1.0, 1.0);
+			glBegin(GL_POINTS);
+			for (int i = 0; i < turning_points_exit_temp.size(); i++)
+			{
+				glVertex3f(turning_points_exit_temp[i][0], turning_points_exit_temp[i][1], 0.0);
+			}
+			glEnd();
+
+			glPointSize(point_size);
+			glColor3f(1.0, 1.0, 0.0);
+			glBegin(GL_POINTS);
+			for (int i = 0; i < turning_points_entry_temp.size(); i++)
+			{
+				glVertex3f(turning_points_entry_temp[i][0], turning_points_entry_temp[i][1], 0.0);
+			}
+			glEnd();
+
+
 		}
 
 
