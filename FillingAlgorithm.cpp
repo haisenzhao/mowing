@@ -7,112 +7,6 @@
 
 namespace hpcg {
 
-	void  ToolpathGenerator::ComputeOffsetsForCircle()
-	{
-		double lOffset = toolpath_size / 2.0;
-		std::vector<std::vector<Vector2d>> one_pathes;
-		Circuit::GenerateOffsetHole(contours, lOffset, one_pathes);
-
-		std::vector<Vector2d> contour;
-
-		for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
-		{
-			contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
-		}
-
-		while (one_pathes.size() > 0)
-		{
-			std::cout << "Offsets index: " << offsets.size() << std::endl;
-
-			if (one_pathes.size() == 2)
-			{
-				double d0 = Circuit::Distance(one_pathes[0][0], contour);
-				double d1 = Circuit::Distance(one_pathes[1][0], contour);
-
-				if (d0 < d1)
-				{
-					int insert_index = offsets.size() / 2.0;
-					offsets.insert(offsets.begin() + insert_index, one_pathes[0]);
-
-					std::vector<Vector2d> vecs;
-
-					for (int i = one_pathes[1].size() - 1; i >= 0; i--)
-					{
-						vecs.push_back(one_pathes[1][i]);
-					}
-					offsets.insert(offsets.begin() + insert_index + 1, vecs);
-					std::vector<Vector2d>().swap(vecs);
-				}
-			}
-
-			for (int i = 0; i < one_pathes.size(); i++)
-			{
-				std::vector<Vector2d>().swap(one_pathes[i]);
-			}
-			std::vector<std::vector<Vector2d>>().swap(one_pathes);
-
-			lOffset = lOffset + toolpath_size;
-			Circuit::GenerateOffsetHole(contours, lOffset, one_pathes);
-		}
-
-		std::vector<Vector2d>().swap(contour);
-
-	}
-
-	void ToolpathGenerator::ComputeOffsets_temp()
-	{
-		double lOffset = toolpath_size / 2.0;
-		std::vector<std::vector<Vector2d>> one_pathes;
-		Circuit::GenerateOffsetHole(contours, lOffset, one_pathes);
-
-		while (one_pathes.size() > 0)
-		{
-			std::cout << "Offsets index: " << offsets.size() << std::endl;
-
-			for (int i = 0; i < one_pathes.size(); i++)
-			{
-				offsets.push_back(one_pathes[i]);
-			}
-
-			offsetses.push_back(one_pathes);
-
-			for (int i = 0; i < one_pathes.size(); i++)
-			{
-				std::vector<Vector2d>().swap(one_pathes[i]);
-			}
-			std::vector<std::vector<Vector2d>>().swap(one_pathes);
-
-			lOffset = lOffset + toolpath_size;
-			Circuit::GenerateOffsetHole(contours, lOffset, one_pathes);
-		}
-	}
-
-	void ToolpathGenerator::ComputeOffsets(std::vector<Vector2d> &contour)
-	{
-		double lOffset = toolpath_size / 2.0;
-		std::vector<std::vector<Vector2d>> one_pathes;
-		Circuit::GenerateOffset(contour, lOffset, one_pathes);
-
-		while (one_pathes.size() > 0)
-		{
-			std::cout << "Offsets index: " << offsets.size() << std::endl;
-
-			for (int i = 0; i < one_pathes.size(); i++)
-			{
-				offsets.push_back(one_pathes[i]);
-			}
-
-			for (int i = 0; i < one_pathes.size(); i++)
-			{
-				std::vector<Vector2d>().swap(one_pathes[i]);
-			}
-			std::vector<std::vector<Vector2d>>().swap(one_pathes);
-
-			lOffset = lOffset + toolpath_size;
-			Circuit::GenerateOffset(contour, lOffset, one_pathes);
-		}
-	}
-
 	void ToolpathGenerator::Output_tree(std::string path)
 	{
 		std::ofstream file(path);
@@ -189,44 +83,16 @@ namespace hpcg {
 		file.close();
 	}
 
-	void ToolpathGenerator::DetectEntryExitPoints(std::vector<Vector2d> &outside_offset, std::vector<Vector2d> &inside_offset, Vector2d &outside_entry_point, Vector2d &outside_exit_point, Vector2d &inside_entry_point, Vector2d &inside_exit_point)
-	{
-		double m_d = MAXDOUBLE;
-		int m_d_index = -1;
 
-		for (int i = 0; i < inside_offset.size(); i++)
-		{
-			Vector2d v0 = inside_offset[(i - 1 + inside_offset.size()) % inside_offset.size()];
-			Vector2d v1 = inside_offset[i];
-			Vector2d v2 = inside_offset[(i + 1 + inside_offset.size()) % inside_offset.size()];
 
-			double angle = Circuit::Angle(Vector2d(v0[0] - v1[0], v0[1] - v1[1]), Vector2d(v2[0] - v1[0], v2[1] - v1[1]));
-
-			if (abs(angle - PI / 2.0) < m_d)
-			{
-				m_d = abs(angle - PI / 2.0);
-				m_d_index = i;
-			}
-		}
-
-		inside_entry_point = inside_offset[m_d_index];
-		double d = Circuit::FindNearestPointPar(inside_entry_point, inside_offset);
-		double entry_point_d = Circuit::ComputeNextTurningPoint_complex(d, toolpath_size, inside_offset);
-		inside_exit_point = Circuit::GetOnePointFromOffset(entry_point_d, inside_offset);
-
-		double outside_entry_d = Circuit::FindNearestPointPar(inside_entry_point, outside_offset);
-		double outside_exit_d = Circuit::FindNearestPointPar(inside_exit_point, outside_offset);
-
-		outside_entry_point = Circuit::GetOnePointFromOffset(outside_entry_d, outside_offset);
-		outside_exit_point = Circuit::GetOnePointFromOffset(outside_exit_d, outside_offset);
-	}
+	
 
 	void  ToolpathGenerator::FillingAlgorithmBasedOnOffsets()
 	{
 		for (int i = 0; i < smooth_number; i++)
 			PolygonSmoothing();
 
-		ComputeOffsets_temp();
+		Circuit::ComputeOffsets(toolpath_size, contours, offsets, offsetses);
 
 		//build offset graph
 		#pragma region build_offset_graph
@@ -341,15 +207,13 @@ namespace hpcg {
 
 				Vector2d entry_point;
 				Vector2d exit_point;
-				Vector2d v0, v1;
-				DetectEntryExitPoints(offsets[decompose_offset[i][1]], offsets[decompose_offset[i][0]], v0, v1, entry_point, exit_point);
+				Circuit::FindOptimalEntryExitPoints(toolpath_size, offsets[decompose_offset[i][0]],entry_point, exit_point);
 
 				//generate Fermat spiral
 				FermatsSpiralTrick(offsets0, entry_point, exit_point);
 
 				entry_spirals.push_back(entry_spiral);
 				exit_spirals.push_back(exit_spiral);
-
 
 				//get connecting points
 				double entry_d = Circuit::FindNearestPointPar(entry_spiral[entry_spiral.size()-1],offsets[next_index]);
@@ -360,6 +224,9 @@ namespace hpcg {
 
 				turning_points_entry.push_back(connecting_entry_point);
 				turning_points_exit.push_back(connecting_exit_point);
+
+				//input cutting points
+				Tree::InputCuttingPoints(connect_nodes, cutting_points, next_index, entry_d, exit_d);
 
 				//inpute connecting lines
 				std::vector<Vector2d> one_path;
@@ -372,10 +239,6 @@ namespace hpcg {
 				pathes.push_back(one_path);
 				std::vector<Vector2d>().swap(one_path);
 
-
-				//input cutting points
-				Tree::InputCuttingPoints(connect_nodes, cutting_points, next_index, entry_d, exit_d);
-				
 				std::vector<std::vector<Vector2d>>().swap(offsets0);
 				std::vector<Vector2d>().swap(entry_spiral);
 				std::vector<Vector2d>().swap(exit_spiral);
@@ -394,12 +257,15 @@ namespace hpcg {
 
 				Vector2d entry_point;
 				Vector2d exit_point;
-				Vector2d connecting_entry_point;
-				Vector2d connecting_exit_point;
-				DetectEntryExitPoints(offsets[next_index], offsets[decompose_offset[i][decompose_offset[i].size() - 1]], connecting_entry_point, connecting_exit_point, entry_point, exit_point);
+				Circuit::FindOptimalEntryExitPoints(toolpath_size,offsets[decompose_offset[i][decompose_offset[i].size() - 1]],  entry_point, exit_point);
 
-				double entry_d = Circuit::FindNearestPointPar(connecting_entry_point, offsets[next_index]);
-				double exit_d = Circuit::FindNearestPointPar(connecting_exit_point, offsets[next_index]);
+				//get connecting points
+				double entry_d = Circuit::FindNearestPointPar(entry_point, offsets[next_index]);
+				Vector2d connecting_entry_point = Circuit::GetOnePointFromOffset(entry_d, offsets[next_index]);
+
+				double exit_d = Circuit::FindNearestPointPar(exit_point, offsets[next_index]);
+				Vector2d connecting_exit_point = Circuit::GetOnePointFromOffset(exit_d, offsets[next_index]);
+
 
 				//input cutting points
 				bool b = Circuit::CheckEnclosed(offsets[next_index], offsets[decompose_offset[i][decompose_offset[i].size() - 1]]);
@@ -429,7 +295,6 @@ namespace hpcg {
 				pathes.push_back(one_path);
 				std::vector<Vector2d>().swap(one_path);
 
-
 				//generate Fermat spiral
 				FermatsSpiralTrick(offsets0, entry_point, exit_point);
 				std::vector<std::vector<Vector2d>>().swap(offsets0);
@@ -451,9 +316,6 @@ namespace hpcg {
 
 		for (int i = 2; i < connect_edges.size(); i=i+2)
 		{
-			//connect_edges[i]
-			//connect_edges[i+1]
-
 			int node_index_0 = connect_edges[i];
 			int node_index_1 = connect_edges[i + 1];
 
@@ -478,10 +340,8 @@ namespace hpcg {
 				Circuit::ConnectTwoTrunkNodes(toolpath_size, offsets[node_index_0], offsets[node_index_1],
 					cutting_points[cutting_index_0], cutting_points[cutting_index_1], pathes_temp, turning_points_entry_temp, turning_points_exit_temp);
 			}
-
-			//cutting_points[node_index_0]
-			//cutting_points[node_index_1]
-			//offsets
+		
+			break;
 		}
 
 
@@ -493,106 +353,5 @@ namespace hpcg {
 		std::vector<int>().swap(edges);
 	}
 
-	void ToolpathGenerator::FillingAlgorithm()
-	{
-		for (int i = 0; i < smooth_number; i++)
-			PolygonSmoothing();
 
-		//create the region
-		std::vector<Vector2d> contour;
-		for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
-		{
-			contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
-		}
-		//ComputeOffsets(contour);
-
-		//return;
-
-		region = Region(contour);
-		std::vector<Vector2d>().swap(contour);
-
-		region.DetectInnerConcavePoints();
-		region.sdg.GenerateRegionMedialAxisPoints();
-		region.sdg.GenerateVoronoiEdgePoints();
-		region.sdg.ComputePointsDegree();
-		region.sdg.DetectMaximalAndMinimalPoints();
-		region.sdg.DecomposeMedialAxis1();
-		//region.sdg.DetectCriticalPoints1(region.inner_concave_points, toolpath_size, toolpath_size / 8.0);
-		region.sdg.DetectCriticalPoints(region.inner_concave_points, toolpath_size);
-		region.ComputeCuttingPoints();
-		region.DecomposeSubregions();
-
-		//Generate Fermat spiral for each sub-region
-		//GenerateOffsetsForAllPolygons();
-
-		region.GenerateConnectedGraph(toolpath_size);
-		region.ComputeTSPlikePath();
-		region.ComputeEntryAndExitPoints();
-
-		if (region.polygons.size() == 1)
-		{
-			Vector2d entry_p_0 = Circuit::GetOnePointFromOffset(entry_d_0, region.polygons[0]);
-			Vector2d exit_p_0 = Circuit::GetOnePointFromOffset(exit_d_0, region.polygons[0]);
-
-			//FermatsSpiralTrick(region.polygons[0], entry_p_0, exit_p_0);
-			//FermatsSpiralSmooth1(region.polygons[0], entry_p_0, exit_p_0);
-			FermatsSpiralSmooth(region.polygons[0], entry_p_0, exit_p_0);
-			//FermatSpiral(region.polygons[0], entry_p_0, exit_p_0);
-			region.entry_spirals.push_back(entry_spiral);
-			region.exit_spirals.push_back(exit_spiral);
-		}
-		else
-		{
-			for (int i = 0; i < region.polygons.size(); i++)
-			{
-				if (debug_int_0 >= 0)
-				{
-					if (i != debug_int_0)
-						continue;
-				}
-		
-				std::vector<std::vector<Vector2d>>().swap(offsets);
-				std::vector<Vector2d>().swap(entry_spiral);
-				std::vector<Vector2d>().swap(exit_spiral);
-				//FermatSpiral(region.polygons[i], region.polygons_entry_exit[i][0], region.polygons_entry_exit[i][1]);
-				FermatsSpiralTrick(region.polygons[i], region.polygons_entry_exit[i][0], region.polygons_entry_exit[i][1]);
-				//FermatsSpiralSmooth(region.polygons[i], region.polygons_entry_exit[i][0], region.polygons_entry_exit[i][1]);
-				region.entry_spirals.push_back(entry_spiral);
-				region.exit_spirals.push_back(exit_spiral);
-			}
-		}
-	}
-	      
-	void ToolpathGenerator::GenerateOffsetsForAllPolygons()
-	{
-		for (int i = 0; i < region.polygons.size(); i++)
-		{
-			double lOffset = toolpath_size/2.0;
-
-			do
-			{
-				std::vector<std::vector<Vector2d>> offset;
-				
-				Circuit::GenerateOffset(region.polygons[i], lOffset, offset);
-				lOffset = lOffset + toolpath_size;
-				if (offset.size() > 0)
-				{
-					for (int j = 0; j < offset.size(); j++)
-					{
-						offsets.push_back(offset[j]);
-						std::vector<Vector2d>().swap(offset[j]);
-					}
-
-					std::vector<std::vector<Vector2d>>().swap(offset);
-				}
-				else
-				{
-					std::vector<std::vector<Vector2d>>().swap(offset);
-					break;
-				}
-
-			} while (true);
-
-		}
-	}
 }

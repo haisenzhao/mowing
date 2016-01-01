@@ -101,145 +101,6 @@ namespace hpcg {
 		}
 	};
 
-
-
-	class SegmentDelaunayGraphs
-	{
-	public:
-		SDG2 sdg;
-
-		std::vector<Vector2d> contour;
-
-		std::vector<Vector2d> medial_axis_points;
-		std::vector<Vector2d> voronoi_edge_points;
-
-		std::vector<Vector2d> maximal_points;
-		std::vector<Vector2d> minimal_points;
-
-		std::vector<int> minimal_points_index;
-
-		std::vector<Vector2d> critical_points;
-
-		std::vector<Vector2d> save_critical_points;
-
-		std::vector<int> medial_axis_points_degree;
-		std::vector<bool> medial_axis_points_used;
-		std::vector<double> medial_axis_points_radius;
-		std::vector<std::vector<int>> medial_axis_points_degree_related;
-
-		std::vector<std::vector<int>> mas;
-
-		~SegmentDelaunayGraphs()
-		{
-			sdg.clear();
-			std::vector<Vector2d>().swap(contour);
-			std::vector<Vector2d>().swap(medial_axis_points);
-			std::vector<Vector2d>().swap(voronoi_edge_points);
-			std::vector<Vector2d>().swap(maximal_points);
-			std::vector<Vector2d>().swap(minimal_points);
-			
-			std::vector<int>().swap(minimal_points_index);
-
-			std::vector<Vector2d>().swap(critical_points);
-
-			std::vector<Vector2d> critical_points;
-			std::vector<int> critical_points_index;
-
-			std::vector<int>().swap(medial_axis_points_degree);
-			std::vector<bool>().swap(medial_axis_points_used);
-			std::vector<double>().swap(medial_axis_points_radius);
-			for (int i = 0; i < medial_axis_points_degree_related.size(); i++)
-			{
-				std::vector<int>().swap(medial_axis_points_degree_related[i]);
-			}
-			std::vector<std::vector<int>>().swap(medial_axis_points_degree_related);
-
-			for (int i = 0; i < mas.size(); i++)
-			{
-				std::vector<int>().swap(mas[i]);
-			}
-			std::vector<std::vector<int>>().swap(mas);
-		}
-
-		SegmentDelaunayGraphs()
-		{
-		}
-
-		SegmentDelaunayGraphs(std::vector<Vector2d> &vecs);
-
-		//generate medial axis
-		void GenerateRegionMedialAxisPoints();
-
-		//generate voronoi graph
-		void GenerateVoronoiEdgePoints();
-
-		//compute points degree
-		void ComputePointsDegree();
-
-		//detect maximal points
-		void DetectMaximalAndMinimalPoints();
-
-		void DetectCriticalPoints(std::vector<Vector2d> &inner_concave_points, double toolpath_size);
-		void DetectCriticalPoints1(std::vector<Vector2d> &inner_concave_points, double toolpath_size,double delta);
-
-		void DecomposeMedialAxis();
-		void DecomposeMedialAxis1();
-
-		void SearchForHalfPath(int start_index, std::vector<int> &half_path);
-
-		double HalfPathLength(std::vector<int> &half_path);
-	};
-
-	class Region
-	{
-		public:
-
-		std::vector<Vector2d> contour;
-		std::vector<Vector2d> inner_concave_points;
-		SegmentDelaunayGraphs sdg;
-		std::vector<Vector2d> cutting_points;
-		std::vector<std::vector<Vector2d>> polygons;
-		std::vector<Vector2d> entry_exit_points;
-
-		std::vector<int> connected_graph;
-		
-		std::vector<std::vector<int>> connected_graph_de;
-		std::vector<std::vector<int>> connected_graph_de_index;
-		std::vector<std::vector<Vector2d>> polygons_entry_exit;
-
-		std::vector<std::vector<Vector2d>> entry_spirals;
-		std::vector<std::vector<Vector2d>> exit_spirals;
-
-		std::vector<Vector2d> connected_regions;
-
-		Region()
-		{
-
-		}
-
-		Region(std::vector<Vector2d> &vecs);
-
-		~Region();
-
-		//detect inner concave points
-		void DetectInnerConcavePoints();
-
-		//compute cuting points
-		void ComputeCuttingPoints();
-
-		//Decompose the whole region into sub-regions with the cutting points
-		void DecomposeSubregions();
-
-		//Generate the connected graph of sub-regions 
-		void GenerateConnectedGraph(double toolpath_size);
-
-		//Compute a TSP-like path of the connected graph
-		void ComputeTSPlikePath();
-
-		//Compute entry and exit points of the sub-regions
-		void ComputeEntryAndExitPoints();
-	};
-
 	class ToolpathGenerator
 	{
 	protected:
@@ -289,7 +150,6 @@ namespace hpcg {
 		int smooth_number = 0;
 
 		SDG2 sdg;
-		Region region;
 
 		std::vector<Vector2d> entry_spiral;
 		std::vector<Vector2d> exit_spiral;
@@ -313,14 +173,9 @@ namespace hpcg {
 
 
 
-
-
 		ToolpathGenerator();
 		void Init(TMeshProcessor* render);
 		void LoadContour();
-		void ComputeOffsets(std::vector<Vector2d> &contour);
-		void ComputeOffsets_temp();
-		void ComputeOffsetsForCircle();
 
 		void BuildeImageSpace();
 		void StepDebug();
@@ -332,9 +187,6 @@ namespace hpcg {
 		//offset fermat spiral
 		void FermatSpiral(std::vector<Vector2d> &contour, Vector2d input_entry_point, Vector2d input_exit_point);
 
-		void FermatsSpiralSmooth(std::vector<Vector2d> &contour, Vector2d input_entry_point, Vector2d input_exit_point);
-		void FermatsSpiralSmooth1(std::vector<Vector2d> &contour, Vector2d input_entry_point, Vector2d input_exit_point);
-		void FermatsSpiralTrick(std::vector<Vector2d> &contour, Vector2d input_entry_point, Vector2d input_exit_point);
 		void FermatsSpiralTrick(std::vector<std::vector<Vector2d>> &local_offsets, Vector2d input_entry_point, Vector2d input_exit_point);
 
 		void GenerateZigzag();
@@ -342,7 +194,6 @@ namespace hpcg {
 		void ArchinedeanSpiral(std::vector<Vector2d> &contour);
 		void ArchinedeanSpiralSmooth(std::vector<Vector2d> &contour);
 		void ArchinedeanSpiralTrick(std::vector<Vector2d> &contour);
-		void ArchinedeanSpiralTrickForCircle(std::vector<Vector2d> &contour);
 
 		double ComputeNextTurningPoint(double d, double distance, int offset_index);
 
@@ -352,16 +203,10 @@ namespace hpcg {
 		void OutputPathTwoCircles();
 
 		//filling algorithm
-		void FillingAlgorithm();
 		void FillingAlgorithmBasedOnOffsets();
-
-		void GenerateOffsetsForAllPolygons();
 
 		void Output_tree(std::string path);
 		void Output_tree(std::vector<int> &nodes, std::vector<int> &edges, std::string path);
-
-		void DetectEntryExitPoints(std::vector<Vector2d> &outside_offset, std::vector<Vector2d> &inside_offset, Vector2d &outside_entry_point, Vector2d &outside_exit_point, Vector2d &inside_entry_point, Vector2d &inside_exit_point);
-		//void DetectEntryExitPoints(std::vector<Vector2d> &offset_0, std::vector<Vector2d> &offset_1, Vector2d &entry_point, Vector2d &exit_point, Vector2d &next_entry_point, Vector2d &next_exit_point);
 
 	};
 } 

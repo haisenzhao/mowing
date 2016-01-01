@@ -164,7 +164,6 @@ namespace hpcg {
 			return m_d;
 		}
 
-
 		static double GetTotalLength(std::vector<Vector2d> &input_points)
 		{
 			double length = 0.0;

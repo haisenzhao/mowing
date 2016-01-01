@@ -112,7 +112,6 @@ namespace hpcg {
 		file.close();
 	}
 
-
 	void ToolpathGenerator::GenerateZigzagForCircle()
 	{
 		std::vector<Vector2d> contour;

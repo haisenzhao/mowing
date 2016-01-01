@@ -161,7 +161,6 @@ namespace hpcg {
 
 		if (work_model == 1)
 		{
-			FillingAlgorithm();
 		}
 		
 		if (work_model == 2)
@@ -194,8 +193,7 @@ namespace hpcg {
 
 		if (work_model == 6)
 		{
-			toolpath_size = 0.4 / 30.0*max_double;
-			ArchinedeanSpiralTrickForCircle(contour);
+	
 		}
 
 		if (work_model == 7)
@@ -486,71 +484,11 @@ namespace hpcg {
 					}
 
 			}
-
-	
-			for (int i = 0; i < region.entry_spirals.size(); i++)
-			{
-				glLineWidth(line_width);
-				glColor3f(255.0 / 255.0, 42.0 / 255.0, 26.0 / 255.0);
-				glBegin(GL_LINE_STRIP);
-				for (int j = 0; j < region.entry_spirals[i].size(); j++)
-				{
-					glVertex3f(region.entry_spirals[i][j][0], region.entry_spirals[i][j][1], 0.0);
-				}
-				glEnd();
-
-				glLineWidth(line_width);
-				glColor3f(2 / 255.0, 126 / 255.0, 18.0 / 255.0);
-				glBegin(GL_LINE_STRIP);
-				for (int j = 0; j < region.exit_spirals[i].size(); j++)
-				{
-					glVertex3f(region.exit_spirals[i][j][0], region.exit_spirals[i][j][1], 0.0);
-				}
-				glEnd();
-
-				if (false)
-				{
-					glLineWidth(line_width);
-					glColor3f(255.0 / 255.0, 42.0 / 255.0, 26.0 / 255.0);
-					glBegin(GL_LINE_STRIP);
-
-					if (region.entry_spirals[i].size() > 0 && region.exit_spirals[i].size())
-					{
-						glVertex3f(region.entry_spirals[i][region.entry_spirals[i].size() - 1][0], region.entry_spirals[i][region.entry_spirals[i].size() - 1][1], 0.0);
-						glVertex3f(region.exit_spirals[i][region.exit_spirals[i].size() - 1][0], region.exit_spirals[i][region.exit_spirals[i].size() - 1][1], 0.0);
-					}
-					glEnd();
-				}
-			}
-
-			if (false)
-			for (int i = 0; i < region.connected_regions.size(); i = i + 2)
-			{
-				glLineWidth(line_width);
-				glColor3f(255.0 / 255.0, 42.0 / 255.0, 26.0 / 255.0);
-				glBegin(GL_LINE_STRIP);
-				glVertex3f(region.connected_regions[i][0], region.connected_regions[i][1], 0.0);
-				glVertex3f(region.connected_regions[i+1][0], region.connected_regions[i+1][1], 0.0);
-				glEnd();
-			}
-
 		}
 
 
 		if (draw_entry_exit_points)
 		{
-
-			for (int i = 0; i < region.polygons_entry_exit.size(); i++)
-			{
-				for (int j = 0; j < region.polygons_entry_exit[i].size(); j++)
-				{
-					glPointSize(point_size);
-					glColor3f(200 / 255.0, 78 / 255.0,46.0 / 255.0);
-					glBegin(GL_POINTS);
-					glVertex3f(region.polygons_entry_exit[i][j][0], region.polygons_entry_exit[i][j][1], 0.0);
-					glEnd();
-				}
-			}
 
 			if (false)
 			if (entry_spiral.size() > 0 && exit_spiral.size())
@@ -565,170 +503,6 @@ namespace hpcg {
 				glColor3f(2 / 255.0, 126 / 255.0, 18.0 / 255.0);
 				glBegin(GL_POINTS);
 				glVertex3f(exit_spiral[0][0], exit_spiral[0][1], 0.0);
-				glEnd();
-			}
-		}
-
-		if (draw_voronoi)
-		{
-			for (int i = 0; i < region.sdg.voronoi_edge_points.size(); i = i + 2)
-			{
-				glLineWidth(2);
-				glColor3f(0.5, 0.5, 0.0);
-				glBegin(GL_LINE_STRIP);
-				glVertex3f(region.sdg.voronoi_edge_points[i][0], region.sdg.voronoi_edge_points[i][1], 0.0);
-				glVertex3f(region.sdg.voronoi_edge_points[(i + 1) % region.sdg.voronoi_edge_points.size()][0], region.sdg.voronoi_edge_points[(i + 1) % region.sdg.voronoi_edge_points.size()][1], 0.0);
-				glEnd();
-			}
-
-		}
-
-		if (draw_medial_axis)
-		{
-			
-			for (int i = 0; i < region.sdg.medial_axis_points.size(); i = i + 2)
-			{
-				glLineWidth(2 * 2);
-				glColor3f(0.4, 0.4, 0.0);
-				glBegin(GL_LINE_STRIP);
-				glVertex3f(region.sdg.medial_axis_points[i][0], region.sdg.medial_axis_points[i][1], 0.0);
-				glVertex3f(region.sdg.medial_axis_points[(i + 1) % region.sdg.medial_axis_points.size()][0], region.sdg.medial_axis_points[(i + 1) % region.sdg.medial_axis_points.size()][1], 0.0);
-				glEnd();
-			}
-			if (false)
-				for (int i = 0; i < region.sdg.medial_axis_points.size(); i = i + 2)
-				{
-					glPointSize(2 * 2 + 2);
-					glColor3f(1.0, 0.0, 0.0);
-					glBegin(GL_POINTS);
-					glVertex3f(region.sdg.medial_axis_points[i][0], region.sdg.medial_axis_points[i][1], 0.0);
-					glVertex3f(region.sdg.medial_axis_points[(i + 1) % region.sdg.medial_axis_points.size()][0], region.sdg.medial_axis_points[(i + 1) % region.sdg.medial_axis_points.size()][1], 0.0);
-					glEnd();
-				}
-		}
-
-		if (draw_cutting_points)
-		{
-			for (int i = 0; i < region.cutting_points.size(); i = i + 2)
-			{
-				glPointSize(point_size);
-				glColor3f(2 / 255.0, 126 / 255.0, 18.0 / 255.0);
-				glBegin(GL_LINE_STRIP);
-				glVertex3f(region.cutting_points[i][0], region.cutting_points[i][1], 0.0);
-				glVertex3f(region.cutting_points[i + 1][0], region.cutting_points[i + 1][1], 0.0);
-				glEnd();
-			}
-
-			glPointSize(point_size);
-			glColor3f(2 / 255.0, 126 / 255.0, 18.0 / 255.0);
-			glBegin(GL_POINTS);
-			for (int i = 0; i < region.cutting_points.size(); i++)
-			{
-				glVertex3f(region.cutting_points[i][0], region.cutting_points[i][1], 0.0);
-			}
-			glEnd();
-		}
-
-
-		if (draw_save_critical_points)
-		{
-			glPointSize(point_size);
-			glColor3f(1.0, 0.0, 0.0);
-			glBegin(GL_POINTS);
-			for (int i = 0; i < region.sdg.save_critical_points.size(); i++)
-			{
-				glVertex3f(region.sdg.save_critical_points[i][0], region.sdg.save_critical_points[i][1], 0.0);
-			}
-			glEnd();
-		}
-
-		
-		if (false)
-		{
-			for (int j = 0; j < region.sdg.mas.size(); j++)
-			{
-				if (j != iiiiii)
-				{
-					continue;
-				}
-
-				glPointSize(point_size);
-				glColor3f(1.0, 0.0, 0.0);
-				glBegin(GL_POINTS);
-				if (iiiiii >= 0 && iiiiii<region.sdg.mas.size())
-				{
-					for (int i = 0; i < region.sdg.mas[iiiiii].size(); i++)
-					{
-						glVertex3f(region.sdg.medial_axis_points[region.sdg.mas[iiiiii][i]][0], region.sdg.medial_axis_points[region.sdg.mas[iiiiii][i]][1], 0.0);
-					}
-				}
-				glEnd();
-			}
-
-		}
-
-
-		if (draw_minimal_points)
-		{
-			glPointSize(point_size);
-			glColor3f(255.0 / 255.0, 255.0 / 255.0, 26.0 / 255.0);
-			glBegin(GL_POINTS);
-			for (int i = 0; i < region.sdg.minimal_points.size(); i++)
-			{
-				glVertex3f(region.sdg.minimal_points[i][0], region.sdg.minimal_points[i][1], 0.0);
-			}
-			glEnd();
-		}
-
-		if (draw_minimal_points)
-		{
-			glPointSize(point_size);
-			glColor3f(0.0, 1.0, 0.0);
-			glBegin(GL_POINTS);
-			for (int i = 0; i < region.sdg.critical_points.size(); i++)
-			{
-				glVertex3f(region.sdg.critical_points[i][0], region.sdg.critical_points[i][1], 0.0);
-			}
-			glEnd();
-		}
-
-		if (draw_maximal_points)
-		{
-			glPointSize(point_size);
-			glColor3f(0.0, 0.0, 1.0);
-			glBegin(GL_POINTS);
-			for (int i = 0; i < region.sdg.maximal_points.size(); i++)
-			{
-				glVertex3f(region.sdg.maximal_points[i][0], region.sdg.maximal_points[i][1], 0.0);
-			}
-			glEnd();
-		}
-
-
-
-		if (draw_inner_concave_points)
-		{
-			glPointSize(point_size);
-			glColor3f(0.0, 255.0 / 255.0, 255.0 / 255.0);
-			glBegin(GL_POINTS);
-			for (int i = 0; i < region.inner_concave_points.size(); i++)
-			{
-				glVertex3f(region.inner_concave_points[i][0], region.inner_concave_points[i][1], 0.0);
-			}
-			glEnd();
-		}
-
-		if (draw_polygons_entry_exit)
-		{
-			for (int i = 0; i < region.polygons_entry_exit.size(); i++)
-			{
-				glPointSize(point_size);
-				glColor3f(1.0, 0.0, 0.0);
-				glBegin(GL_POINTS);
-
-				glVertex3f(region.polygons_entry_exit[i][0][0], region.polygons_entry_exit[i][0][1], 0.0);
-				glVertex3f(region.polygons_entry_exit[i][1][0], region.polygons_entry_exit[i][1][1], 0.0);
-
 				glEnd();
 			}
 		}
@@ -776,26 +550,6 @@ namespace hpcg {
 
 		}
 
-
-
-
-
-		if (false)
-		{
-			glPointSize(point_size);
-			glColor3f(1.0, 0.0, 0.0);
-			glBegin(GL_LINE_LOOP);
-			if (iiiiii >= 0 && iiiiii < region.polygons.size())
-			{
-				for (int i = 0; i < region.polygons[iiiiii].size(); i++)
-				{
-					glVertex3f(region.polygons[iiiiii][i][0], region.polygons[iiiiii][i][1], 0.0);
-				}
-			}
-
-			glEnd();
-
-		}
 
 
 	}

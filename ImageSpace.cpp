@@ -56,8 +56,6 @@ namespace hpcg {
 		}
 	}
 
-
-
 	void ToolpathGenerator::DrawPixel(int i, int j)
 	{
 		if (image_space.check(i, j))
