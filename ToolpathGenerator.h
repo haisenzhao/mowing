@@ -101,6 +101,49 @@ namespace hpcg {
 		}
 	};
 
+	struct TrunkNode
+	{
+		TrunkNode(int offset_id)
+		{
+			related_offset_id = offset_id;
+		}
+		int related_offset_id;
+		//related_offset_id is not the trunknode id
+		//trunk id is its index in trunknodes
+
+		std::vector<double> connecting_leaf_nodes_points;
+		std::vector<int> connecting_leaf_nodes_spiral_id;
+
+		std::vector<double> connecting_trunk_nodes_points;
+		std::vector<int> connecting_trunk_nodes_id;
+
+		std::vector<double> connecting_points;
+		std::vector<int> connecting_points_related_pathes_id;
+		std::vector<int> connecting_points_pairs;
+
+		//There are two kinds of connecting points, connecting leaf node and trunk node, connecting trunk node and trunk node.
+		//Connecting_points includes all these two connecting points.
+		//Each connecting point refers to a one_path in pathes. 
+
+		void AllConnectingPoints()
+		{
+			for (int i = 0; i < connecting_leaf_nodes_points.size(); i++)
+			{
+				connecting_points.push_back(connecting_leaf_nodes_points[i]);
+			}
+			for (int i = 0; i < connecting_trunk_nodes_points.size(); i++)
+			{
+				connecting_points.push_back(connecting_trunk_nodes_points[i]);
+			}
+
+			for (int i = 0; i < connecting_points.size(); i++)
+			{
+				connecting_points_related_pathes_id.push_back(-1);
+			}
+		}
+	};
+
+
 	class ToolpathGenerator
 	{
 	protected:
@@ -112,6 +155,8 @@ namespace hpcg {
 		std::vector<int> offset_graph;
 		std::vector<int> offset_degree;
 		std::vector<std::vector<int>> decompose_offset;
+
+		std::vector<Vector2d> one_single_path;
 
 		ImageSpace image_space;
 
@@ -134,18 +179,9 @@ namespace hpcg {
 		bool draw_aixs;
 		bool draw_contour;
 		bool draw_offsets;
-		bool draw_spiral;
 		bool draw_turning_points;
-		bool draw_voronoi;
-		bool draw_medial_axis;
-		bool draw_minimal_points;
 		bool draw_entry_exit_spiral;
-		bool draw_entry_exit_points;
-		bool draw_polygons_entry_exit;
-		bool draw_cutting_points;
-		bool draw_inner_concave_points;
-		bool draw_maximal_points;
-		bool draw_save_critical_points;
+		bool draw_spiral;
 
 		int smooth_number = 0;
 
@@ -172,7 +208,6 @@ namespace hpcg {
 		std::vector<Vector2d> aaaa;
 
 
-
 		ToolpathGenerator();
 		void Init(TMeshProcessor* render);
 		void LoadContour();
@@ -187,7 +222,8 @@ namespace hpcg {
 		//offset fermat spiral
 		void FermatSpiral(std::vector<Vector2d> &contour, Vector2d input_entry_point, Vector2d input_exit_point);
 
-		void FermatsSpiralTrick(std::vector<std::vector<Vector2d>> &local_offsets, Vector2d input_entry_point, Vector2d input_exit_point);
+		void FermatsSpiralTrick(std::vector<std::vector<Vector2d>> &local_offsets, 
+			Vector2d input_entry_point, Vector2d input_exit_point, Vector2d &output_entry_point, Vector2d &output_exit_point);
 
 		void GenerateZigzag();
 		void GenerateZigzagForCircle();
@@ -203,6 +239,8 @@ namespace hpcg {
 		void OutputPathTwoCircles();
 
 		//filling algorithm
+
+		void BuildOffsetGraph();
 		void FillingAlgorithmBasedOnOffsets();
 
 		void Output_tree(std::string path);

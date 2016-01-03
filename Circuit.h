@@ -537,6 +537,96 @@ namespace hpcg {
 		}
 
 		//points moving on circuit
+		static double DeltaDEuclideanDistance(double d, double distance, std::vector<Vector2d> &input_points, std::vector<Vector2d> &one_path)
+		{
+			Vector2d v = Circuit::GetOnePointFromOffset(d, input_points);
+
+			std::vector<Vector2d> vecs;
+
+			int divided_nb = 50;
+			for (int i = 0; i < divided_nb; i++)
+			{
+				Point_2 p0(v[0] + abs(distance)*sin(i * 2 * PI / (double)divided_nb), v[1] + abs(distance)*cos(i * 2 * PI / (double)divided_nb));
+				Point_2 p1(v[0] + abs(distance)*sin((i + 1) * 2 * PI / (double)divided_nb), v[1] + abs(distance)*cos((i + 1) * 2 * PI / (double)divided_nb));
+
+				one_path.push_back(Vector2d(p0[0], p0[1]));
+
+				for (int j = 0; j < input_points.size(); j++)
+				{
+					Point_2 p2(input_points[j].x, input_points[j].y);
+					Point_2 p3(input_points[(j + 1) % input_points.size()].x, input_points[(j + 1) % input_points.size()].y);
+
+					CGAL::Object result = CGAL::intersection(Segment_2(p0, p1), Segment_2(p2, p3));
+
+					if (const Point_2 *ipoint = CGAL::object_cast<Point_2>(&result))
+					{
+						vecs.push_back(Vector2d(ipoint->x(), ipoint->y()));
+					}
+				}
+			}
+
+			if (distance > 0)
+			{
+				for (int i = 0; i < vecs.size(); i++)
+				{
+					double delta_d = Circuit::FindNearestPointPar(vecs[i], input_points);
+
+					if (abs(delta_d - d) > 0.5)
+					{
+						if (delta_d > d)
+						{
+							d = d + 1.0;
+						}
+						else
+						{
+							delta_d = delta_d + 1.0;
+						}
+					}
+
+					if (delta_d > d)
+					{
+						if (delta_d > 1.0)
+							delta_d = delta_d - 1.0;
+
+						std::vector<Vector2d>().swap(vecs);
+						return delta_d;
+					}
+				}
+			}
+			else
+			{
+				for (int i = 0; i < vecs.size(); i++)
+				{
+					double delta_d = Circuit::FindNearestPointPar(vecs[i], input_points);
+
+					if (abs(delta_d - d) > 0.5)
+					{
+						if (delta_d > d)
+						{
+							d = d + 1.0;
+						}
+						else
+						{
+							delta_d = delta_d + 1.0;
+						}
+					}
+
+					if (delta_d < d)
+					{
+						if (delta_d > 1.0)
+							delta_d = delta_d - 1.0;
+
+						std::vector<Vector2d>().swap(vecs);
+						return delta_d;
+					}
+				}
+			}
+
+			std::vector<Vector2d>().swap(vecs);
+			return -1.0;
+		}
+
+		//points moving on circuit
 		static double DeltaDEuclideanDistance(double d, double distance, std::vector<Vector2d> &input_points)
 		{
 			Vector2d v = Circuit::GetOnePointFromOffset(d, input_points);
@@ -653,7 +743,6 @@ namespace hpcg {
 
 		}
 
-
 		static void FindOptimalEntryExitPoints(double toolpath_size,std::vector<Vector2d> &offset, Vector2d &entry_point, Vector2d &exit_point)
 		{
 			double m_d = MAXDOUBLE;
@@ -680,8 +769,57 @@ namespace hpcg {
 			exit_point = Circuit::GetOnePointFromOffset(entry_point_d, offset);
 		}
 
-		static void ComputeNextEntryExitPoint(double toolpath_size, std::vector<Vector2d> &outside_offset,
-			std::vector<Vector2d> &inside_offset, Vector2d &entry_point, Vector2d &exit_point, Vector2d &next_entry_point, Vector2d &next_exit_point)
+		static Vector2d DetectNearestPoint(Vector2d v0, Vector2d v1, std::vector<Vector2d> &input_points)
+		{
+			std::vector<Vector2d> vecs;
+
+			for (int i = 0; i < input_points.size(); i++)
+			{
+				Vector2d v2 = input_points[i];
+				Vector2d v3 = input_points[(i + 1) % input_points.size()];
+
+				CGAL::Object result = CGAL::intersection(Line_2(Point_2(v0[0], v0[1]), Point_2(v1[0], v1[1])), Segment_2(Point_2(v2[0], v2[1]), Point_2(v3[0], v3[1])));
+
+				if (const Point_2 *ipoint = CGAL::object_cast<Point_2>(&result))
+				{
+					vecs.push_back(Vector2d(ipoint->x(), ipoint->y()));
+				}
+			}
+		
+			assert(vecs.size() != 0);
+
+			double min_d = Strip::Distance(v0, vecs[0]);
+			int index = 0;
+
+			for (int i = 1; i < vecs.size(); i++)
+			{
+				double d = Strip::Distance(v0,vecs[i]);
+
+				if (d < min_d)
+				{
+					min_d = d;
+					index = i;
+				}
+			}
+
+			return vecs[index];
+		}
+
+		static void ComputeNextEntryExitPointForOuter(double toolpath_size, std::vector<Vector2d> &outside_offset,std::vector<Vector2d> &inside_offset, 
+			Vector2d &entry_point, Vector2d &exit_point, Vector2d &next_entry_point, Vector2d &next_exit_point)
+		{
+
+			Vector2d n(exit_point[0] - entry_point[0], exit_point[1] - entry_point[1]);
+			Vector2d pn(-n[1],n[0]);
+
+			next_entry_point = DetectNearestPoint(entry_point, Vector2d(entry_point[0] + pn[0], entry_point[1] + pn[1]), inside_offset);
+			next_exit_point = DetectNearestPoint(exit_point, Vector2d(exit_point[0] + pn[0], exit_point[1] + pn[1]), inside_offset);
+		}
+
+
+
+		static void ComputeNextEntryExitPointForInner(double toolpath_size, std::vector<Vector2d> &outside_offset,std::vector<Vector2d> &inside_offset,
+			Vector2d &entry_point, Vector2d &exit_point, Vector2d &next_entry_point, Vector2d &next_exit_point)
 		{
 			double entry_d_1 = Circuit::FindNearestPointPar(entry_point, inside_offset);
 			double exit_d_1 = Circuit::FindNearestPointPar(exit_point, inside_offset);
@@ -715,6 +853,9 @@ namespace hpcg {
 			next_entry_point = entry_p_1;
 			next_exit_point = exit_p_1;
 		}
+
+
+
 
 		//for fermat spiral generation
 		static Line_2 GetRelatedLine(Vector2d v, std::vector<Vector2d> &input_points)
@@ -810,10 +951,60 @@ namespace hpcg {
 		{
 			return d0 > d1;
 		}
-		static void CutACircuit(std::vector<Vector2d> &input_points, std::vector<double> &cutting_points, std::vector<std::vector<Vector2d>> &pathes)
+
+
+		static void CutACircuit(std::vector<Vector2d> &input_points, TrunkNode &trunk_node)
 		{
 			std::vector<double> cutting_points_par;
 
+			for (int i = 0; i <trunk_node.connecting_points.size(); i = i + 2)
+			{
+				double par = (trunk_node.connecting_points[i] + trunk_node.connecting_points[i + 1]) / 2.0;
+				cutting_points_par.push_back(par);
+			}
+
+			std::sort(cutting_points_par.begin(), cutting_points_par.end(), compare_double);
+
+
+			for (int i = 0; i < cutting_points_par.size(); i++)
+			{
+				double cur_par = cutting_points_par[i];
+				double next_par = cutting_points_par[(i + 1) % cutting_points_par.size()];
+
+				int cur_par_index = -1;
+				int next_par_index = -1;
+
+				for (int j = 0; j < trunk_node.connecting_points.size() && (cur_par_index<0 || next_par_index<0); j = j + 2)
+				{
+					double par = (trunk_node.connecting_points[j] + trunk_node.connecting_points[j + 1]) / 2.0;
+
+					if (abs(par - cur_par) < 0.00001)
+					{
+						cur_par_index = j;
+					}
+
+					if (abs(par - next_par) < 0.00001)
+					{
+						next_par_index = j;
+					}
+				}
+
+				if (cur_par_index >= 0 && next_par_index >= 0)
+				{
+					trunk_node.connecting_points_pairs.push_back(cur_par_index + 1);
+					trunk_node.connecting_points_pairs.push_back(next_par_index);
+				}
+			
+			}
+			std::vector<double>().swap(cutting_points_par);
+		}
+
+
+		static void CutACircuit(std::vector<Vector2d> &input_points, std::vector<double> &cutting_points,
+			std::vector<std::vector<Vector2d>> &pathes, std::vector<int> &connecting)
+		{
+			std::vector<double> cutting_points_par;
+		
 			for (int i = 0; i < cutting_points.size(); i = i + 2)
 			{
 				double par = (cutting_points[i] + cutting_points[i + 1]) / 2.0;
@@ -851,7 +1042,10 @@ namespace hpcg {
 					//SelectOnePartOffset();
 					std::vector<Vector2d> one_path;
 
-					SelectOnePartOffset(input_points, cutting_points[cur_par_index + 1], cutting_points[next_par_index], one_path);
+					//SelectOnePartOffset(input_points, cutting_points[cur_par_index + 1], cutting_points[next_par_index], one_path);
+
+					connecting.push_back(cur_par_index + 1);
+					connecting.push_back(next_par_index);
 
 					pathes.push_back(one_path);
 
@@ -859,7 +1053,7 @@ namespace hpcg {
 				}
 
 			}
-
+			std::vector<double>().swap(cutting_points_par);
 		}
 	
 
@@ -913,22 +1107,22 @@ namespace hpcg {
 			double &outside_offset_start, double &outside_offset_end, double &inside_offset_start, double &inside_offset_end, std::vector<std::vector<Vector2d>> &pathes_temp)
 		{
 			std::vector<Vector2d> offset;
-			GenerateOffset(outside_offset, toolpath_size, offset);
+			GenerateOffsetForOutside(inside_offset, toolpath_size, offset);
 
-			bool b = SharingPart(inside_offset, offset, inside_offset_start, inside_offset_end, pathes_temp);
+			bool b = SharingPart(outside_offset, offset, outside_offset_start, outside_offset_end, pathes_temp);
 
 			if (b)
 			{
-				outside_offset_start = 0.0;
-				outside_offset_end = 1.0;
+				inside_offset_start = 0.0;
+				inside_offset_end = 1.0;
 			}
 			else
 			{
-				Vector2d v0 = GetOnePointFromOffset(inside_offset_start, inside_offset);
-				Vector2d v1 = GetOnePointFromOffset(inside_offset_end, inside_offset);
+				Vector2d v0 = GetOnePointFromOffset(outside_offset_start, outside_offset);
+				Vector2d v1 = GetOnePointFromOffset(outside_offset_end, outside_offset);
 
-				outside_offset_start = FindNearestPointPar(v0,outside_offset);
-				outside_offset_end = FindNearestPointPar(v1, outside_offset);
+				inside_offset_start = FindNearestPointPar(v0,inside_offset);
+				inside_offset_end = FindNearestPointPar(v1, inside_offset);
 			}
 
 			std::vector<Vector2d>().swap(offset);
@@ -968,7 +1162,9 @@ namespace hpcg {
 		}
 
 		static void ConnectTwoTrunkNodes(double toolpath_size, std::vector<Vector2d> &offset0, std::vector<Vector2d> &offset1,
-			std::vector<double> &cutting_points_0, std::vector<double> &cutting_points_1, std::vector<std::vector<Vector2d>> &pathes_temp, std::vector<Vector2d> &turning_points_entry_temp, std::vector<Vector2d> &turning_points_exit_temp)
+			int trunk_node_index_0, int trunk_node_index_1,
+			TrunkNode &trunk_node_0, TrunkNode &trunk_node_1,
+			std::vector<std::vector<Vector2d>> &pathes, std::vector<std::vector<Vector2d>> &pathes_temp, std::vector<Vector2d> &turning_points_entry_temp, std::vector<Vector2d> &turning_points_exit_temp)
 		{
 			double offset_0_start;
 			double offset_0_end;
@@ -979,36 +1175,147 @@ namespace hpcg {
 
 			std::vector<Vector2d> offset_0_path;
 			SelectOnePartOffset(offset0, offset_0_end, offset_0_start, offset_0_path);
-			pathes_temp.push_back(offset_0_path);
+			//pathes_temp.push_back(offset_0_path);
 	
 			std::vector<Vector2d> offset_1_path;
 			SelectOnePartOffset(offset1, offset_1_end, offset_1_start, offset_1_path);
-			pathes_temp.push_back(offset_1_path);
+			//pathes_temp.push_back(offset_1_path);
 
-			for (int i = 0; i < cutting_points_0.size(); i = i + 2)
+			bool b = false;
+
+			for (int i = 0; i < trunk_node_0.connecting_leaf_nodes_points.size()&&!b; i = i + 2)
 			{
-				double d0 = cutting_points_0[i];
-				double d1 = cutting_points_0[i+1];
+				double cp_0 = trunk_node_0.connecting_leaf_nodes_points[i];
+				double cp_1 = trunk_node_0.connecting_leaf_nodes_points[i + 1];
 
-				double d00 = DeltaDEuclideanDistance(d0, toolpath_size, offset0);
+				Vector2d v0 = GetOnePointFromOffset(cp_0, offset0);
+				Vector2d v1 = GetOnePointFromOffset(cp_1, offset0);
 
-				Vector2d v0 = GetOnePointFromOffset(d0, offset0);
-				Vector2d v1 = GetOnePointFromOffset(d1, offset0);
-
-				Vector2d v00 = GetOnePointFromOffset(d00, offset0);
-
-				
-				d0 = Strip::Distance(v0, offset_0_path);
-				d1 = Strip::Distance(v1, offset_0_path);
+				double d0 = Strip::Distance(v0, offset_0_path);
+				double d1 = Strip::Distance(v1, offset_0_path);
 
 				if (d0 < 0.00001&&d1 < 0.00001)
 				{
+					double d00 = DeltaDEuclideanDistance(cp_0, toolpath_size, offset0);
+					Vector2d v00 = GetOnePointFromOffset(d00, offset0);
+
 					Vector2d next_entry_point;
 					Vector2d next_exit_point;
 
-					ComputeNextEntryExitPoint(toolpath_size, offset0, offset1, v0, v00, next_entry_point, next_exit_point);
-					turning_points_entry_temp.push_back(next_entry_point);
-					turning_points_exit_temp.push_back(next_exit_point);
+					ComputeNextEntryExitPointForInner(toolpath_size, offset0, offset1, v0, v00, next_entry_point, next_exit_point);
+					
+					//turning_points_entry_temp.push_back(v0);
+					//turning_points_exit_temp.push_back(v00);
+
+					//turning_points_entry_temp.push_back(next_entry_point);
+					//turning_points_exit_temp.push_back(next_exit_point);
+					b = true;
+
+					//cutting_points_0.push_back(d00);
+					//cutting_points_0.push_back(cp_0);
+
+					//cutting_points_1.push_back(Circuit::FindNearestPointPar(next_exit_point, offset1));
+					//cutting_points_1.push_back(Circuit::FindNearestPointPar(next_entry_point, offset1));
+					
+					/*
+					std::vector<Vector2d> one_path;
+					one_path.push_back(v0);
+					one_path.push_back(next_entry_point);
+					pathes.push_back(one_path);
+					std::vector<Vector2d>().swap(one_path);
+					one_path.push_back(v00);
+					one_path.push_back(next_exit_point);
+					pathes.push_back(one_path);
+					*/
+
+					//int cutting_index_0, int cutting_index_1,
+					//std::vector<int> &cutting_points_index_0, std::vector<int> &cutting_points_index_1,
+
+					trunk_node_0.connecting_trunk_nodes_points.push_back(d00);
+					trunk_node_0.connecting_trunk_nodes_points.push_back(cp_0);
+
+					trunk_node_1.connecting_trunk_nodes_points.push_back(Circuit::FindNearestPointPar(next_exit_point, offset1));
+					trunk_node_1.connecting_trunk_nodes_points.push_back(Circuit::FindNearestPointPar(next_entry_point, offset1));
+
+					trunk_node_0.connecting_trunk_nodes_id.push_back(trunk_node_index_1);
+					trunk_node_0.connecting_trunk_nodes_id.push_back(trunk_node_1.connecting_trunk_nodes_points.size() - 2);
+					trunk_node_0.connecting_trunk_nodes_id.push_back(trunk_node_index_1);
+					trunk_node_0.connecting_trunk_nodes_id.push_back(trunk_node_1.connecting_trunk_nodes_points.size() - 1);
+
+					trunk_node_1.connecting_trunk_nodes_id.push_back(trunk_node_index_0);
+					trunk_node_1.connecting_trunk_nodes_id.push_back(trunk_node_0.connecting_trunk_nodes_points.size() - 2);
+					trunk_node_1.connecting_trunk_nodes_id.push_back(trunk_node_index_0);
+					trunk_node_1.connecting_trunk_nodes_id.push_back(trunk_node_0.connecting_trunk_nodes_points.size() - 1);
+
+				}
+			}
+
+			for (int i = 0; i < trunk_node_1.connecting_leaf_nodes_points.size() && !b; i = i + 2)
+			{
+
+				double cp_0 = trunk_node_1.connecting_leaf_nodes_points[i];
+				double cp_1 = trunk_node_1.connecting_leaf_nodes_points[i + 1];
+				Vector2d v0 = GetOnePointFromOffset(cp_0, offset1);
+				Vector2d v1 = GetOnePointFromOffset(cp_1, offset1);
+				double d0 = Strip::Distance(v0, offset_1_path);
+				double d1 = Strip::Distance(v1, offset_1_path);
+				
+				if (d0 < 0.00001&&d1 < 0.00001)
+				{
+
+					double d11 = DeltaDEuclideanDistance(cp_1, -toolpath_size, offset1);
+					Vector2d v11 = GetOnePointFromOffset(d11, offset1);
+
+					//turning_points_entry_temp.push_back(v1);
+					//turning_points_exit_temp.push_back(v11);
+
+					Vector2d next_entry_point;
+					Vector2d next_exit_point;
+
+					ComputeNextEntryExitPointForOuter(toolpath_size, offset1, offset0, v1, v11, next_entry_point, next_exit_point);
+					//turning_points_entry_temp.push_back(next_entry_point);
+					//turning_points_exit_temp.push_back(next_exit_point);
+
+					b = true;
+
+					//cutting_points_1.push_back(cp_1);
+					//cutting_points_1.push_back(d11);
+
+					//cutting_points_0.push_back(Circuit::FindNearestPointPar(next_entry_point, offset0));
+					//cutting_points_0.push_back(Circuit::FindNearestPointPar(next_exit_point, offset0));
+
+					/*
+					std::vector<Vector2d> one_path;
+					one_path.push_back(v1);
+					one_path.push_back(next_entry_point);
+					pathes.push_back(one_path);
+					std::vector<Vector2d>().swap(one_path);
+					one_path.push_back(v11);
+					one_path.push_back(next_exit_point);
+					pathes.push_back(one_path);
+					*/
+
+					//int cutting_index_0, int cutting_index_1,
+					//std::vector<int> &cutting_points_index_0, std::vector<int> &cutting_points_index_1,
+
+
+
+					trunk_node_1.connecting_trunk_nodes_points.push_back(cp_1);
+					trunk_node_1.connecting_trunk_nodes_points.push_back(d11);
+
+					trunk_node_0.connecting_trunk_nodes_points.push_back(Circuit::FindNearestPointPar(next_entry_point, offset0));
+					trunk_node_0.connecting_trunk_nodes_points.push_back(Circuit::FindNearestPointPar(next_exit_point, offset0));
+
+					trunk_node_1.connecting_trunk_nodes_id.push_back(trunk_node_index_0);
+					trunk_node_1.connecting_trunk_nodes_id.push_back(trunk_node_0.connecting_trunk_nodes_points.size() - 2);
+					trunk_node_1.connecting_trunk_nodes_id.push_back(trunk_node_index_0);
+					trunk_node_1.connecting_trunk_nodes_id.push_back(trunk_node_0.connecting_trunk_nodes_points.size() - 1);
+
+					trunk_node_0.connecting_trunk_nodes_id.push_back(trunk_node_index_1);
+					trunk_node_0.connecting_trunk_nodes_id.push_back(trunk_node_1.connecting_trunk_nodes_points.size() - 2);
+					trunk_node_0.connecting_trunk_nodes_id.push_back(trunk_node_index_1);
+					trunk_node_0.connecting_trunk_nodes_id.push_back(trunk_node_1.connecting_trunk_nodes_points.size() - 1);
+
 				}
 			}
 

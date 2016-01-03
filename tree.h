@@ -121,7 +121,8 @@ namespace hpcg {
 			std::vector<std::vector<int>>().swap(containers);
 		}
 
-		static void InputCuttingPoints(std::vector<int> &nodes,std::vector<std::vector<double>> &cutting_points, int node_id, double cutting_points_0, double cutting_points_1)
+		static void InputCuttingPoints(std::vector<int> &nodes, std::vector<std::vector<double>> &cutting_points, std::vector<std::vector<int>> &cutting_points_index,
+			int node_id, double cutting_points_0, double cutting_points_1, int cutting_points_index_0, int cutting_points_index_1)
 		{
 			int node_index = -1;
 
@@ -138,6 +139,9 @@ namespace hpcg {
 
 			cutting_points[node_index].push_back(cutting_points_0);
 			cutting_points[node_index].push_back(cutting_points_1);
+
+			cutting_points_index[node_index].push_back(cutting_points_index_0);
+			cutting_points_index[node_index].push_back(cutting_points_index_1);
 		}
 
 		static void DecompositionATree(std::vector<int> &nodes, std::vector<int> &edges, std::vector<int> &connect_nodes, std::vector<int> &connect_edges, std::vector<std::vector<int>> &pathes)
@@ -351,6 +355,7 @@ namespace hpcg {
 			std::vector<int>().swap(related_int);
 
 			return int_index;
+
 		}
 
 	};

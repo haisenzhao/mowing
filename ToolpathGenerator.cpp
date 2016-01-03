@@ -13,6 +13,9 @@
 namespace hpcg {
 
 	ToolpathGenerator::ToolpathGenerator(){
+
+
+	
 	}
 
 	int iiiiii = 0;
@@ -41,19 +44,7 @@ namespace hpcg {
 		draw_offsets = false;
 		draw_entry_exit_spiral = true;
 		draw_turning_points = true;
-
 		draw_spiral = true;
-		draw_voronoi = false;
-		draw_medial_axis = false;
-		draw_minimal_points = false;
-		draw_maximal_points = false;
-		draw_entry_exit_points = true;
-		draw_cutting_points = false;
-
-		draw_polygons_entry_exit = false;
-		draw_inner_concave_points = false;
-
-		draw_save_critical_points = false;
 
 		line_width = 5;
 		point_size = 5;
@@ -75,19 +66,13 @@ namespace hpcg {
 		file >> debug_int_1;
 
 		file >> str;
-		file >> draw_medial_axis;
-
-		file >> str;
-		file >> draw_minimal_points;
-
-		file >> str;
-		file >> draw_maximal_points;
-
-		file >> str;
 		file >> load_path;
 
 		file >> str;
 		file >> draw_entry_exit_spiral;
+
+		file >> str;
+		file >> draw_spiral;
 
 		file >> str;
 		file >> draw_turning_points;
@@ -95,13 +80,6 @@ namespace hpcg {
 
 		file >> str;
 		file >> draw_offsets;
-
-		file >> str;
-		file >> draw_cutting_points;
-
-
-		file >> str;
-		file >> draw_entry_exit_points;
 
 		file >> str;
 		file >> line_width;
@@ -407,7 +385,7 @@ namespace hpcg {
 				glLineWidth(line_width);
 				glColor3f(255.0 / 255.0, 42.0 / 255.0, 26.0 / 255.0);
 				glBegin(GL_LINE_STRIP);
-				for (int j = 0; j < entry_spiral.size(); j++)
+				for (int j = 0; j < entry_spiral.size() - 9; j++)
 				{
 					glVertex3f(entry_spiral[j][0], entry_spiral[j][1], 0.0);
 				}
@@ -426,7 +404,7 @@ namespace hpcg {
 
 			if (work_model == 7)
 			{
-				if (false)
+				if (draw_spiral)
 				{
 					for (int i = 0; i < entry_spirals.size(); i++)
 					{
@@ -454,58 +432,73 @@ namespace hpcg {
 				}
 				
 				//pathes
-				if (true)
-				for (int i = 0; i < pathes.size(); i++)
+				if (false)
 				{
-
-					glLineWidth(line_width);
-					glColor3f(2 / 255.0, 126 / 255.0, 18.0 / 255.0);
-					glBegin(GL_LINE_STRIP);
-					for (int j = 0; j < pathes[i].size(); j++)
+					for (int i = 0; i < pathes.size(); i++)
 					{
-						glVertex3f(pathes[i][j][0], pathes[i][j][1], 0.0);
+
+						glLineWidth(line_width);
+						glColor3f(2 / 255.0, 126 / 255.0, 18.0 / 255.0);
+						glBegin(GL_LINE_STRIP);
+						for (int j = 0; j < pathes[i].size(); j++)
+						{
+							glVertex3f(pathes[i][j][0], pathes[i][j][1], 0.0);
+						}
+						glEnd();
+					}
+				}
+
+
+				//one_single_path
+
+				if (iiiiii % 2 == 1)
+				{
+					glLineWidth(line_width * 2);
+					glColor3f(0.0, 0.0, 1.0);
+					glBegin(GL_LINE_STRIP);
+					for (int j = 0; j <one_single_path.size(); j++)
+					{
+						glVertex3f(one_single_path[j][0], one_single_path[j][1], 0.0);
 					}
 					glEnd();
 				}
 
-				//pathes_temp
-				if (iiiiii%2==1)
+
+
+				if (true)
+				{
 					for (int i = 0; i < pathes_temp.size(); i++)
 					{
-
-						glLineWidth(line_width);
-						glColor3f(1.0,0.0,0.0);
-						glBegin(GL_LINE_STRIP);
-						for (int j = 0; j < pathes_temp[i].size(); j++)
+						if (pathes_temp[i].size() == 1)
 						{
-							glVertex3f(pathes_temp[i][j][0], pathes_temp[i][j][1], 0.0);
+							glPointSize(point_size * 3);
+							glColor3f(0.0, 0.0, 1.0);
+							glBegin(GL_POINTS);
+							for (int j = 0; j < pathes_temp[i].size(); j++)
+							{
+								glVertex3f(pathes_temp[i][j][0], pathes_temp[i][j][1], 0.0);
+							}
+							glEnd();
 						}
-						glEnd();
+						else
+						{
+							glLineWidth(line_width);
+							glColor3f(0.0, 0.0, 1.0);
+							glBegin(GL_LINE_STRIP);
+							for (int j = 0; j < pathes_temp[i].size(); j++)
+							{
+								glVertex3f(pathes_temp[i][j][0], pathes_temp[i][j][1], 0.0);
+							}
+							glEnd();
+						}
 					}
+				}
+
+				//pathes_temp
 
 			}
 		}
 
-
-		if (draw_entry_exit_points)
-		{
-
-			if (false)
-			if (entry_spiral.size() > 0 && exit_spiral.size())
-			{
-				glPointSize(point_size);
-				glColor3f(255.0 / 255.0, 42.0 / 255.0, 26.0 / 255.0);
-				glBegin(GL_POINTS);
-				glVertex3f(entry_spiral[0][0], entry_spiral[0][1], 0.0);
-				glEnd();
-
-				glPointSize(point_size);
-				glColor3f(2 / 255.0, 126 / 255.0, 18.0 / 255.0);
-				glBegin(GL_POINTS);
-				glVertex3f(exit_spiral[0][0], exit_spiral[0][1], 0.0);
-				glEnd();
-			}
-		}
 
 	
 		if (draw_turning_points)
@@ -546,7 +539,6 @@ namespace hpcg {
 				glVertex3f(turning_points_entry_temp[i][0], turning_points_entry_temp[i][1], 0.0);
 			}
 			glEnd();
-
 
 		}
 
