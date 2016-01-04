@@ -156,6 +156,9 @@ namespace hpcg {
 		std::vector<int> offset_degree;
 		std::vector<std::vector<int>> decompose_offset;
 
+
+		std::string offset_file;
+
 		std::vector<Vector2d> one_single_path;
 
 		ImageSpace image_space;
@@ -172,6 +175,9 @@ namespace hpcg {
 
 		int debug_int_0;
 		int debug_int_1;
+		int debug_int_2;
+
+		std::vector<TrunkNode> trunk_nodes;
 
 	public:
 		
@@ -201,6 +207,9 @@ namespace hpcg {
 
 		std::vector<Vector2d> turning_points_entry_temp;
 		std::vector<Vector2d> turning_points_exit_temp;
+
+		std::vector<Vector2d> debug_points;
+
 
 		double entry_d_0;
 		double exit_d_0;
@@ -234,6 +243,7 @@ namespace hpcg {
 		double ComputeNextTurningPoint(double d, double distance, int offset_index);
 
 		void PolygonSmoothing();
+		void DirectlyPolygonSmoothing();
 		void OutputPath(std::vector<Vector2d> &vecs, std::string path);
 		void OutputPath(std::string path);
 		void OutputPathTwoCircles();
@@ -246,5 +256,7 @@ namespace hpcg {
 		void Output_tree(std::string path);
 		void Output_tree(std::vector<int> &nodes, std::vector<int> &edges, std::string path);
 
+		void Output_Offsetses(std::string path);
+		void Input_Offsetses(std::string path);
 	};
 } 

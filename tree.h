@@ -338,23 +338,38 @@ namespace hpcg {
 
 		static int NextNode(std::vector<int> &edges, std::vector<int> &one_path)
 		{
-			int int_index = -1;
-			std::vector<int> related_int;
-			NextNode(edges,one_path[one_path.size()-1],related_int);
-
-			assert(related_int.size() == 2);
-
-			if (related_int[0] == one_path[one_path.size() - 2])
+			if (one_path.size() == 1)
 			{
-				int_index = related_int[1];
+				int int_index = -1;
+				std::vector<int> related_int;
+				NextNode(edges, one_path[one_path.size() - 1], related_int);
+
+				assert(related_int.size() == 1);
+
+				return related_int[0];
 			}
 			else
 			{
-				int_index = related_int[0];
-			}
-			std::vector<int>().swap(related_int);
 
-			return int_index;
+				int int_index = -1;
+				std::vector<int> related_int;
+				NextNode(edges, one_path[one_path.size() - 1], related_int);
+
+				assert(related_int.size() == 2);
+
+				if (related_int[0] == one_path[one_path.size() - 2])
+				{
+					int_index = related_int[1];
+				}
+				else
+				{
+					int_index = related_int[0];
+				}
+				std::vector<int>().swap(related_int);
+
+				return int_index;
+
+			}
 
 		}
 

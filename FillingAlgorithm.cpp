@@ -7,6 +7,79 @@
 
 namespace hpcg {
 
+	void ToolpathGenerator::Output_Offsetses(std::string path)
+	{
+		std::ofstream file(path);
+
+		file << offsetses.size() << std::endl;
+
+		//std::vector<std::vector<std::vector<Vector2d>>> offsetses;
+		//offsetses[i] :: std::vector<std::vector<Vector2d>>
+		//offsetses[i][j] ::std::vector<Vector2d>
+		//offsetses[i][j][k]:: Vector2d
+
+		for (int i = 0; i < offsetses.size(); i++)
+		{
+			file << offsetses[i].size() << std::endl;
+			for (int j = 0; j < offsetses[i].size(); j++)
+			{
+				file << offsetses[i][j].size() << std::endl;
+				for (int k = 0; k < offsetses[i][j].size(); k++)
+				{
+
+					file << offsetses[i][j][k][0] << " " << offsetses[i][j][k][1] << std::endl;
+				}
+			}
+		}
+
+		file.clear();
+		file.close();
+	}
+
+	void ToolpathGenerator::Input_Offsetses(std::string path)
+	{
+		std::ifstream file(path, std::ios::in);
+
+		if (!file)
+		{
+			std::cout << "" << std::endl;
+			return;
+		}
+
+		int offsetses_size;
+
+		file >> offsetses_size;
+
+		for (int i = 0; i < offsetses_size; i++)
+		{
+			int offsetses_i_size;
+			file >> offsetses_i_size;
+
+			std::vector<std::vector<Vector2d>> pathes;
+
+			for (int j = 0; j < offsetses_i_size; j++)
+			{
+				int offsetses_i_j_size;
+				file >> offsetses_i_j_size;
+				std::vector<Vector2d> path;
+				for (int k = 0; k < offsetses_i_j_size; k++)
+				{
+					Vector2d v;
+					file >> v[0] >> v[1];
+					path.push_back(v);
+				}
+				pathes.push_back(path);
+				offsets.push_back(path);
+			}
+
+			offsetses.push_back(pathes);
+		}
+
+		file.clear();
+		file.close();
+	}
+
+
 	void ToolpathGenerator::Output_tree(std::string path)
 	{
 		std::ofstream file(path);
@@ -134,7 +207,6 @@ namespace hpcg {
 
 	}
 
-
 	int GetTrunkNodeId(std::vector<TrunkNode> &trunk_nodes, int related_offset_id)
 	{
 		int trunk_node_id = -1;
@@ -153,12 +225,22 @@ namespace hpcg {
 	void  ToolpathGenerator::FillingAlgorithmBasedOnOffsets()
 	{
 		for (int i = 0; i < smooth_number; i++)
+		{
 			PolygonSmoothing();
+			DirectlyPolygonSmoothing();
+		}
 
-		Circuit::ComputeOffsets(toolpath_size, contours, offsets, offsetses);
+		std::ifstream file(offset_file, std::ios::in);
 
-
-		return;
+		if (!file)
+		{
+			Circuit::ComputeOffsets(toolpath_size, contours, offsets, offsetses);
+			Output_Offsetses(offset_file);
+		}
+		else
+		{
+			Input_Offsetses(offset_file);
+		}
 
 		BuildOffsetGraph();
 
@@ -194,7 +276,7 @@ namespace hpcg {
 		//decompose_offset_tree
 		std::vector<int> connect_edges;
 		std::vector<int> connect_nodes;
-		std::vector<TrunkNode> trunk_nodes;
+		
 		Tree::DecompositionATree(nodes, mst, connect_nodes,connect_edges, decompose_offset);
 
 		for (int i = 0; i < connect_nodes.size(); i++)
@@ -218,13 +300,11 @@ namespace hpcg {
 		//turning_points_entry
 		for (int i = 0; i < decompose_offset.size(); i++)
 		{
-			/*
 			if (debug_int_0 >= 0)
 			{
 				if (i != debug_int_0)
 					continue;
 			}
-			*/
 
 			if (decompose_offset[i][0] == 0)
 			{
@@ -273,8 +353,16 @@ namespace hpcg {
 				trunk_nodes[trunk_node_id].connecting_leaf_nodes_points.push_back(exit_d);
 				trunk_nodes[trunk_node_id].connecting_leaf_nodes_points.push_back(entry_d);
 
-				trunk_nodes[trunk_node_id].connecting_leaf_nodes_spiral_id.push_back(pathes.size() - 2);
-				trunk_nodes[trunk_node_id].connecting_leaf_nodes_spiral_id.push_back(pathes.size() - 1);
+				if (offsets0.size() % 2 == 0)
+				{
+					trunk_nodes[trunk_node_id].connecting_leaf_nodes_spiral_id.push_back(pathes.size() - 1);
+					trunk_nodes[trunk_node_id].connecting_leaf_nodes_spiral_id.push_back(pathes.size() - 2);
+				}
+				else
+				{
+					trunk_nodes[trunk_node_id].connecting_leaf_nodes_spiral_id.push_back(pathes.size() - 2);
+					trunk_nodes[trunk_node_id].connecting_leaf_nodes_spiral_id.push_back(pathes.size() - 1);
+				}
 
 				std::vector<std::vector<Vector2d>>().swap(offsets0);
 				std::vector<Vector2d>().swap(entry_spiral);
@@ -306,22 +394,12 @@ namespace hpcg {
 				double entry_d = Circuit::FindNearestPointPar(connecting_entry_point, offsets[next_index]);
 				double exit_d = Circuit::FindNearestPointPar(connecting_exit_point, offsets[next_index]);
 
-				/*
-				double entry_d = Circuit::FindNearestPointPar(input_entry_point, offsets[next_index]);
-				Vector2d connecting_entry_point = Circuit::GetOnePointFromOffset(entry_d, offsets[next_index]);
-				double exit_d = Circuit::FindNearestPointPar(input_exit_point, offsets[next_index]);
-				Vector2d connecting_exit_point = Circuit::GetOnePointFromOffset(exit_d, offsets[next_index]);
-				*/
 
 				//inpute connecting lines
-
-				//entry_spiral.insert(entry_spiral.begin(), connecting_entry_point);
-				//exit_spiral.insert(exit_spiral.begin(), connecting_exit_point);
 
 				entry_spirals.push_back(entry_spiral);
 				exit_spirals.push_back(exit_spiral);
 
-				//std::reverse(entry_spiral.begin(), entry_spiral.end());
 				std::reverse(exit_spiral.begin(), exit_spiral.end());
 
 				pathes.push_back(entry_spiral);
@@ -369,7 +447,9 @@ namespace hpcg {
 			}
 		}
 
-		
+		if (debug_int_0>=0)
+		return;
+
 		//connect sub-region to offset mst tree
 		for (int i = 0; i < connect_edges.size(); i=i+2)
 		{
@@ -382,7 +462,7 @@ namespace hpcg {
 			Circuit::ConnectTwoTrunkNodes(toolpath_size, offsets[node_index_0], offsets[node_index_1],
 				trunk_node_id_0, trunk_node_id_1,
 				trunk_nodes[trunk_node_id_0], trunk_nodes[trunk_node_id_1],
-				pathes, pathes_temp, turning_points_entry_temp, turning_points_exit_temp);
+				pathes, pathes_temp, debug_points);
 		}
 
 		for (int i = 0; i < trunk_nodes.size(); i++)
@@ -489,7 +569,7 @@ namespace hpcg {
  				int dasd = 0;
 			}
 
-			if (iter == debug_int_0)
+			if (iter == debug_int_2)
 			{
 				break;
 			}
@@ -595,7 +675,7 @@ namespace hpcg {
 
 			if (abs(start_pathes_index) >= pathes_nb)
 				start_pathes_index = -start_pathes_index;
-
+			
 			
 			int next_pathes_index = -1;
 			bool b = false;
@@ -626,6 +706,7 @@ namespace hpcg {
 					}
 				}
 			}
+
 
 			if (!b)
 			{

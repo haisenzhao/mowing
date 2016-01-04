@@ -146,6 +146,42 @@ namespace hpcg {
 
 	}
 
+
+	void ToolpathGenerator::DirectlyPolygonSmoothing()
+	{
+		std::vector<Vector2d> contour;
+
+
+		for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
+		{
+			contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
+
+		}
+		std::vector<Vector2d> smooth_contour;
+
+		for (int i = 0; i < contour.size(); i++)
+		{
+			Vector2d p0(contour[i][0], contour[i][1]);
+			Vector2d p1(contour[(i + 1) % contour.size()][0], contour[(i + 1) % contour.size()][1]);
+			Vector2d p2(contour[(i + 2) % contour.size()][0], contour[(i + 2) % contour.size()][1]);
+
+			smooth_contour.push_back(Vector2d((p0[0] + p1[0] + p2[0]) / 3.0, (p0[1] + p1[1] + p2[1]) / 3.0));
+		}
+
+		Polygon_2 one_contour;
+		for (int i = 0; i < smooth_contour.size(); i++)
+		{
+			one_contour.push_back(Point_2(smooth_contour[i][0], smooth_contour[i][1]));
+
+		}
+		contours.clear();
+		contours = Polygon_with_holes(one_contour);
+
+		std::vector<Vector2d>().swap(contour);
+		std::vector<Vector2d>().swap(smooth_contour);
+
+	}
+
 	void ToolpathGenerator::PolygonSmoothing()
 	{
 		std::vector<Vector2d> contour;

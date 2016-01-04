@@ -24,14 +24,30 @@ namespace hpcg {
 		}
 
 		//basic functions
-		static double Angle(Vector2d a, Vector2d b)
+		static double Angle2PI(Vector2d a, Vector2d b)
 		{
 			double ab, a1, b1, cosr;
 			ab = a[0] * b[0] + a[1] * b[1];
 			a1 = sqrt(a[0] * a[0] + a[1] * a[1]);
 			b1 = sqrt(b[0] * b[0] + b[1] * b[1]);
 			cosr = ab / a1 / b1;
-			return  acos(cosr);
+			double angle = acos(cosr);
+
+			if (a[0] * b[1] - a[1] * b[0] > 0)
+			{
+				angle = 2 * PI - angle;
+			}
+			return  angle;
+		}
+		static double AnglePI(Vector2d a, Vector2d b)
+		{
+			double ab, a1, b1, cosr;
+			ab = a[0] * b[0] + a[1] * b[1];
+			a1 = sqrt(a[0] * a[0] + a[1] * a[1]);
+			b1 = sqrt(b[0] * b[0] + b[1] * b[1]);
+			cosr = ab / a1 / b1;
+			double angle = acos(cosr);
+			return  angle;
 		}
 
 		//check position relation
@@ -267,6 +283,9 @@ namespace hpcg {
 				lOffset = lOffset + toolpath_size;
 				Circuit::GenerateOffsetHole(contours, lOffset, one_pathes);
 			}
+
+
+
 		}
 
 		static void ComputeOffsets(double toolpath_size, std::vector<Vector2d> &contour, std::vector<std::vector<Vector2d>> &offsets)
@@ -714,6 +733,69 @@ namespace hpcg {
 			return -1.0;
 		}
 
+		static double DeltaDistance(double d, Vector2d v0, double distance, std::vector<Vector2d> &input_points)
+		{
+			Vector2d v = GetOnePointFromOffset(d, input_points);
+
+			int index = Strip::CheckSamePoint(v, input_points);
+			
+			if (index >= 0)
+			{
+				Vector2d v0 = input_points[(index + input_points.size() - 1) % input_points.size()];
+				Vector2d v1 = input_points[(index + input_points.size() + 1) % input_points.size()];
+
+				double angle = AnglePI(Vector2d(v0[0] - v[0], v0[1] - v[1]), Vector2d(v1[0] - v[0], v1[1] - v[1]));
+
+				double delta = DeltaDEuclideanDistance(d, distance / sin(angle), input_points);
+
+				if (delta >= 0)
+				{
+					return delta;
+				}
+				else
+				{
+					return DeltaDEuclideanDistance(d, distance, input_points);
+				}
+			}
+			else
+			{
+
+				Vector2d v1,v2;
+				bool b = false;
+
+				double total_length = GetTotalLength(input_points);
+				double length = 0.0;
+				for (int i = 0; i < input_points.size(); i++)
+				{
+					double l = sqrt((double)CGAL::squared_distance(Point_2(input_points[i].x, input_points[i].y), Point_2(input_points[(i + 1) % input_points.size()].x, input_points[(i + 1) % input_points.size()].y)));
+
+					if (length / total_length < d&&d < (length + l) / total_length)
+					{
+						v1 = input_points[i];
+						v2 = input_points[(i + 1) % input_points.size()];
+					
+						b = true;
+						break;
+					}
+					length += l;
+				}
+				assert(b);
+
+				double angle = AnglePI(Vector2d(v0[0] - v[0], v0[1] - v[1]), Vector2d(v1[0] - v2[0], v1[1] - v2[1]));
+
+				double delta = DeltaDEuclideanDistance(d, distance / sin(angle), input_points);
+
+				if (delta >= 0)
+				{
+					return delta;
+				}
+				else
+				{
+					return DeltaDEuclideanDistance(d, distance, input_points);
+				}
+			}
+		}
+
 		static double DeltaDistance(double d, double distance, std::vector<Vector2d> &input_points)
 		{
 			Vector2d v = GetOnePointFromOffset(d, input_points);
@@ -723,7 +805,7 @@ namespace hpcg {
 				Vector2d v0 = input_points[(index + input_points.size() - 1) % input_points.size()];
 				Vector2d v1 = input_points[(index + input_points.size() + 1) % input_points.size()];
 
-				double angle = Angle(Vector2d(v0[0] - v[0], v0[1] - v[1]), Vector2d(v1[0] - v[0], v1[1] - v[1]));
+				double angle = AnglePI(Vector2d(v0[0] - v[0], v0[1] - v[1]), Vector2d(v1[0] - v[0], v1[1] - v[1]));
 
 				double delta = DeltaDEuclideanDistance(d, distance / sin(angle), input_points);
 
@@ -740,7 +822,6 @@ namespace hpcg {
 			{
 				return DeltaDEuclideanDistance(d, distance, input_points);
 			}
-
 		}
 
 		static void FindOptimalEntryExitPoints(double toolpath_size,std::vector<Vector2d> &offset, Vector2d &entry_point, Vector2d &exit_point)
@@ -754,12 +835,14 @@ namespace hpcg {
 				Vector2d v1 = offset[i];
 				Vector2d v2 = offset[(i + 1 + offset.size()) % offset.size()];
 
-				double angle = Circuit::Angle(Vector2d(v0[0] - v1[0], v0[1] - v1[1]), Vector2d(v2[0] - v1[0], v2[1] - v1[1]));
-
-				if (abs(angle - PI / 2.0) < m_d)
+				double angle = Circuit::Angle2PI(Vector2d(v0[0] - v1[0], v0[1] - v1[1]), Vector2d(v2[0] - v1[0], v2[1] - v1[1]));
+				if (angle <= PI)
 				{
-					m_d = abs(angle - PI / 2.0);
-					m_d_index = i;
+					if (abs(angle - PI / 2.0) < m_d)
+					{
+						m_d = abs(angle - PI / 2.0);
+						m_d_index = i;
+					}
 				}
 			}
 
@@ -840,11 +923,16 @@ namespace hpcg {
 
 				if (n_0[0] * n_1[1] - n_0[1] * n_1[0]>0)
 				{
-					exit_d_1 = Circuit::DeltaDistance(entry_d_1, toolpath_size, inside_offset);
+					double temp = Circuit::DeltaDistance(entry_d_1, toolpath_size, inside_offset);
+
+					if (temp >= 0)
+						exit_d_1 = temp;
 				}
 				else
 				{
-					entry_d_1 = Circuit::DeltaDistance(exit_d_1, toolpath_size, inside_offset);
+					double temp = Circuit::DeltaDistance(exit_d_1, toolpath_size, inside_offset);
+					if (temp >= 0)
+						entry_d_1 = temp;
 				}
 
 				entry_p_1 = Circuit::GetOnePointFromOffset(entry_d_1, inside_offset);
@@ -855,6 +943,48 @@ namespace hpcg {
 		}
 
 
+		//for fermat spiral generation
+		static Line_2 GetRelatedLine(Vector2d v, std::vector<Vector2d> &input_points, std::vector<Vector2d> &debug_points)
+		{
+			assert(Distance(v, input_points)<0.0001);
+
+			Line_2 line_2;
+
+			int index = Strip::CheckSamePoint(v, input_points);
+
+			if (index >= 0)
+			{
+				Vector2d v1 = input_points[(index + input_points.size() - 1) % input_points.size()];
+				line_2 = Line_2(Point_2(v[0], v[1]), Point_2(v1[0], v1[1]));
+			}
+			else
+			{
+				double d = GetTotalLength(input_points);
+				double par = FindNearestPointPar(v, input_points);
+				double length = 0.0;
+				for (int i = 0; i < input_points.size(); i++)
+				{
+					double l = sqrt((double)CGAL::squared_distance(Point_2(input_points[i].x, input_points[i].y), Point_2(input_points[(i + 1) % input_points.size()].x, input_points[(i + 1) % input_points.size()].y)));
+
+					if (length / d < par&&par < (length + l) / d)
+					{
+						Vector2d v1 = input_points[i];
+						Vector2d v2 = input_points[(i + input_points.size() - 1) % input_points.size()];
+
+
+						Vector2d v3 = v;
+						v3[0] = v3[0] + v2[0] - v1[0];
+						v3[1] = v3[1] + v2[1] - v1[1];
+
+						line_2 = Line_2(Point_2(v[0], v[1]), Point_2(v3[0], v3[1]));
+
+						break;
+					}
+					length += l;
+				}
+			}
+			return line_2;
+		}
 
 
 		//for fermat spiral generation
@@ -898,6 +1028,7 @@ namespace hpcg {
 			}
 			return line_2;
 		}
+
 		static Line_2 GetTangent(Vector2d v, std::vector<Vector2d> &input_points)
 		{
 			assert(Distance(v, input_points)<0.0001);
@@ -959,7 +1090,13 @@ namespace hpcg {
 
 			for (int i = 0; i <trunk_node.connecting_points.size(); i = i + 2)
 			{
-				double par = (trunk_node.connecting_points[i] + trunk_node.connecting_points[i + 1]) / 2.0;
+				//double par = (trunk_node.connecting_points[i] + trunk_node.connecting_points[i + 1]) / 2.0;
+
+				Vector2d v0 = Circuit::GetOnePointFromOffset(trunk_node.connecting_points[i], input_points);
+				Vector2d v1 = Circuit::GetOnePointFromOffset(trunk_node.connecting_points[i+1], input_points);
+				Vector2d v3((v0[0] + v1[0]) / 2.0, (v0[1] + v1[1]) / 2.0);
+				double par = Circuit::FindNearestPointPar(v3, input_points);
+
 				cutting_points_par.push_back(par);
 			}
 
@@ -976,7 +1113,13 @@ namespace hpcg {
 
 				for (int j = 0; j < trunk_node.connecting_points.size() && (cur_par_index<0 || next_par_index<0); j = j + 2)
 				{
-					double par = (trunk_node.connecting_points[j] + trunk_node.connecting_points[j + 1]) / 2.0;
+					//double par = (trunk_node.connecting_points[j] + trunk_node.connecting_points[j + 1]) / 2.0;
+
+					Vector2d v0 = Circuit::GetOnePointFromOffset(trunk_node.connecting_points[j], input_points);
+					Vector2d v1 = Circuit::GetOnePointFromOffset(trunk_node.connecting_points[j + 1], input_points);
+					Vector2d v3((v0[0] + v1[0]) / 2.0, (v0[1] + v1[1]) / 2.0);
+					double par = Circuit::FindNearestPointPar(v3, input_points);
+
 
 					if (abs(par - cur_par) < 0.00001)
 					{
@@ -1164,7 +1307,7 @@ namespace hpcg {
 		static void ConnectTwoTrunkNodes(double toolpath_size, std::vector<Vector2d> &offset0, std::vector<Vector2d> &offset1,
 			int trunk_node_index_0, int trunk_node_index_1,
 			TrunkNode &trunk_node_0, TrunkNode &trunk_node_1,
-			std::vector<std::vector<Vector2d>> &pathes, std::vector<std::vector<Vector2d>> &pathes_temp, std::vector<Vector2d> &turning_points_entry_temp, std::vector<Vector2d> &turning_points_exit_temp)
+			std::vector<std::vector<Vector2d>> &pathes, std::vector<std::vector<Vector2d>> &pathes_temp, std::vector<Vector2d> &debug_points)
 		{
 			double offset_0_start;
 			double offset_0_end;
@@ -1278,6 +1421,13 @@ namespace hpcg {
 
 					b = true;
 
+
+					//debug_points.push_back(v1);
+					//debug_points.push_back(v11);
+					//debug_points.push_back(next_entry_point);
+					//debug_points.push_back(next_exit_point);
+					
+					
 					//cutting_points_1.push_back(cp_1);
 					//cutting_points_1.push_back(d11);
 

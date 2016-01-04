@@ -9,6 +9,7 @@
 #include <list>
 #include <set>
 
+#include "Circuit.h"
 
 namespace hpcg {
 
@@ -64,12 +65,10 @@ namespace hpcg {
 
 		file >> debug_int_0;
 		file >> debug_int_1;
+		file >> debug_int_2;
 
 		file >> str;
 		file >> load_path;
-
-		file >> str;
-		file >> draw_entry_exit_spiral;
 
 		file >> str;
 		file >> draw_spiral;
@@ -103,6 +102,12 @@ namespace hpcg {
 		file >> exit_d_0;
 
 		file >> str;
+		file >> str;
+
+		file >> str;
+		file >> offset_file;
+
+
 
 		file.clear();
 		file.close();
@@ -450,10 +455,9 @@ namespace hpcg {
 
 
 				//one_single_path
-
 				if (iiiiii % 2 == 1)
 				{
-					glLineWidth(line_width * 2);
+					glLineWidth(line_width*1.2);
 					glColor3f(0.0, 0.0, 1.0);
 					glBegin(GL_LINE_STRIP);
 					for (int j = 0; j <one_single_path.size(); j++)
@@ -464,14 +468,23 @@ namespace hpcg {
 				}
 
 
-
-				if (true)
+				glPointSize(point_size);
+				glColor3f(0.0, 0.0, 1.0);
+				glBegin(GL_POINTS);
+				for (int j = 0; j < debug_points.size(); j++)
+				{
+					glVertex3f(debug_points[j][0], debug_points[j][1], 0.0);
+				}
+				glEnd();
+	
+				
+				if (iiiiii % 2 == 0)
 				{
 					for (int i = 0; i < pathes_temp.size(); i++)
 					{
 						if (pathes_temp[i].size() == 1)
 						{
-							glPointSize(point_size * 3);
+							glPointSize(point_size);
 							glColor3f(0.0, 0.0, 1.0);
 							glBegin(GL_POINTS);
 							for (int j = 0; j < pathes_temp[i].size(); j++)
