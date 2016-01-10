@@ -164,6 +164,43 @@ namespace hpcg {
 			return m_d;
 		}
 
+		static double DistanceLines(Vector2d v, std::vector<Vector2d> &input_points)
+		{
+			double m_d = MAXDOUBLE;
+			for (int i = 0; i < input_points.size() - 1; i++)
+			{
+				double d = sqrt((double)CGAL::squared_distance(Point_2(v.x, v.y), Line_2(Point_2(input_points[i].x, input_points[i].y), Point_2(input_points[(i + 1) % input_points.size()].x, input_points[(i + 1) % input_points.size()].y))));
+				m_d = min(m_d, d);
+			}
+			return m_d;
+		}
+
+		static Vector2d FindNearestPoint(Vector2d &v, std::vector<Vector2d> &input_points)
+		{
+			double d = Strip::FindNearestPointPar(v, input_points);
+			return Strip::GetOnePointFromStrip(d, input_points);
+		}
+
+		static Vector2d FindNearestPoint(Vector2d &v, std::vector<std::vector<Vector2d>> &input_points)
+		{
+			Vector2d nearest_p;
+			double min_d = MAXDOUBLE;
+			for (int i = 0; i < input_points.size(); i++)
+			{
+				Vector2d near_p = FindNearestPoint(v, input_points[i]);
+				double d = Distance(near_p,v);
+
+				if (d < min_d)
+				{
+
+
+
+					min_d = d;
+				}
+			}
+		}
+
+
 		static double GetTotalLength(std::vector<Vector2d> &input_points)
 		{
 			double length = 0.0;

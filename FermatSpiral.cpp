@@ -69,6 +69,11 @@ namespace hpcg {
 					{
 						int dsd = 0;
 					}
+					if (i == abs(debug_int_1)+1)
+					{
+						break;
+					}
+
 				}
 			}
 
@@ -86,22 +91,24 @@ namespace hpcg {
 			Circuit::SelectOnePartOffset(local_offsets[i], entry_d_0, exit_d_0, entry_half);
 			Circuit::SelectOnePartOffset(local_offsets[i], exit_d_0, entry_d_0, exit_half);
 
-			//debug_points.push_back(exit_p_1);
+			Vector2d n(entry_p_1[0] - exit_p_0[0], entry_p_1[1] - exit_p_0[1]);
+			Line_2 line(Point_2(exit_p_1[0], exit_p_1[1]), Point_2(exit_p_1[0]+n[0], exit_p_1[1]+n[1]));
 
 			// handle the path (entry_d_0 -> exit_d_0)
-			double entry_cutting_d;
-			//double entry_cutting_d = Strip::IntersectPoint(entry_half, Circuit::GetRelatedLine(exit_p_1, local_offsets[i + 1], debug_points));
+			//double entry_cutting_d;
+			double entry_cutting_d = Strip::IntersectPoint(entry_half, line);
+			//double entry_cutting_d = Strip::IntersectPoint(entry_half, Circuit::GetRelatedLine(exit_p_1, local_offsets[i + 1]));
 			if (entry_cutting_d < 0)entry_cutting_d = 0.0;
 			double d0 = Circuit::DeltaDistance(exit_d_0, toolpath_size, local_offsets[i]);
 			Vector2d v = Circuit::GetOnePointFromOffset(d0, local_offsets[i]);
 			d0 = Strip::FindNearestPointPar(v, entry_half);
 			if (entry_cutting_d>d0)
 			{
-				entry_cutting_d = d0;
+				//entry_cutting_d = d0;
 			}
-			entry_cutting_d = d0;
 
-			
+			//entry_cutting_d = d0;
+
 			// handle the path (exit_d_0 -> entry_d_0)
 			double exit_cutting_d;
 			//double exit_cutting_d = Strip::IntersectPoint(exit_half, Circuit::GetRelatedLine(entry_p_1, local_offsets[i + 1]));
@@ -139,20 +146,24 @@ namespace hpcg {
 
 			//inpute data
 			Strip::SelectOnePart(exit_half, 0.0, exit_cutting_d, path);
+
+
 			if (i % 2 == 0)
 			{
 				for (int j = 0; j < path.size(); j++)
 				{
-					exit_spiral.push_back(path[j]);
+					//exit_spiral.push_back(path[j]);
 				}
+				exit_spiral.push_back(path[0]);
 				exit_spiral.push_back(entry_p_1);
 			}
 			else
 			{
 				for (int j = 0; j < path.size(); j++)
 				{
-					entry_spiral.push_back(path[j]);
+					//entry_spiral.push_back(path[j]);
 				}
+				entry_spiral.push_back(path[0]);
 				entry_spiral.push_back(entry_p_1);
 			}
 
@@ -167,7 +178,11 @@ namespace hpcg {
 		output_entry_point = Circuit::GetOnePointFromOffset(entry_d_0, local_offsets[local_offsets.size() - 1]);
 		output_exit_point = Circuit::GetOnePointFromOffset(exit_d_0, local_offsets[local_offsets.size() - 1]);
 
-		if (debug_int_1 != -100)
+
+
+		std::vector<Vector2d> offset;
+		Circuit::GenerationOffsetWithClipper(local_offsets[local_offsets.size() - 1], toolpath_size / 2.0, offset);
+		if (offset.size() == 0)
 		{
 			return;
 		}
@@ -190,13 +205,35 @@ namespace hpcg {
 			exit_d_1 = Circuit::DeltaDistance(entry_d_0, exit_spiral[exit_spiral.size() - 2], toolpath_size, local_offsets[local_offsets.size() - 1]);
 		}
 
-
 		Vector2d entry_p_1 = Circuit::GetOnePointFromOffset(entry_d_1, local_offsets[local_offsets.size() - 1]);
 		Vector2d exit_p_1 = Circuit::GetOnePointFromOffset(exit_d_1, local_offsets[local_offsets.size() - 1]);
 
+
 		std::vector<Vector2d> vecs0, vecs1;
+
+		Circuit::SelectOnePartOffset(local_offsets[local_offsets.size() - 1], entry_d_0, exit_d_0, vecs0);
+		Circuit::SelectOnePartOffset(local_offsets[local_offsets.size() - 1], exit_d_0, entry_d_0, vecs1);
+
+
+		if (Strip::Distance(entry_p_1, vecs1) < 0.0001)
+		{
+			entry_d_1 = entry_d_0;
+		}
+		if (Strip::Distance(exit_p_1, vecs0) < 0.0001)
+		{
+			exit_d_1 = exit_d_0;
+		}
+
+
+		entry_p_1 = Circuit::GetOnePointFromOffset(entry_d_1, local_offsets[local_offsets.size() - 1]);
+		exit_p_1 = Circuit::GetOnePointFromOffset(exit_d_1, local_offsets[local_offsets.size() - 1]);
+
+
+		std::vector<Vector2d>().swap(vecs0);
+		std::vector<Vector2d>().swap(vecs1);
 		Circuit::SelectOnePartOffset(local_offsets[local_offsets.size() - 1], entry_d_0, entry_d_1, vecs0);
 		Circuit::SelectOnePartOffset(local_offsets[local_offsets.size() - 1], exit_d_0, exit_d_1, vecs1);
+
 
 		if ((local_offsets.size() - 1) % 2 == 0)
 		{

@@ -149,14 +149,84 @@ namespace hpcg {
 
 	void ToolpathGenerator::DirectlyPolygonSmoothing()
 	{
+		std::vector<std::vector<Vector2d>> smooth_contour;
+
 		std::vector<Vector2d> contour;
-
-
 		for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
 		{
 			contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
-
 		}
+
+		DirectlyContourSmoothing(contour);
+		smooth_contour.push_back(contour);
+
+
+		for (Polygon_with_holes::Hole_iterator hole_iter = contours.holes_begin(); hole_iter != contours.holes_end(); hole_iter++)
+		{
+			std::vector<Vector2d>().swap(contour);
+			for (Polygon_2::Vertex_iterator ver_iter = hole_iter->vertices_begin(); ver_iter != hole_iter->vertices_end(); ver_iter++)
+			{
+				contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
+			}
+			DirectlyContourSmoothing(contour);
+			smooth_contour.push_back(contour);
+		}
+		std::vector<Vector2d>().swap(contour);
+
+		//input
+		contours.clear();
+
+		Polygon_2 one_contour;
+		for (int i = 0; i < smooth_contour[0].size(); i++)
+		{
+			one_contour.push_back(Point_2(smooth_contour[0][i][0], smooth_contour[0][i][1]));
+		}
+		contours = Polygon_with_holes(one_contour);
+
+
+		for (int j = 1; j < smooth_contour.size(); j++)
+		{
+			one_contour.clear();
+			for (int i = 0; i < smooth_contour[j].size(); i++)
+			{
+				one_contour.push_back(Point_2(smooth_contour[j][i][0], smooth_contour[j][i][1]));
+			}
+			contours.add_hole(one_contour);
+		}
+	}
+
+	void ToolpathGenerator::OptimalDirection()
+	{
+		std::vector<Vector2d> contour;
+		Vector2d center(0.0, 0.0);
+		for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
+		{
+			contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
+			center[0] += ver_iter->x();
+			center[1] += ver_iter->y();
+		}
+		
+		center[0] = center[0] / contour.size();
+		center[1] = center[1] / contour.size();
+
+		Polygon_2 one_contour;
+
+		for (int i = contour.size() - 1; i >= 0; i--)
+			//for (int i = 0; i < contour.size(); i++)
+		{
+			double angle = Circuit::Angle2PI(Vector2d(1.0, 0.0), Vector2d(contour[i][0] - center[0], contour[i][1] - center[1]))-PI/2.0;
+			double radius = Strip::Distance(center,contour[i]);
+			one_contour.push_back(Point_2(radius*cos(angle),radius*sin(angle)));
+		}
+
+		std::vector<Vector2d>().swap(contour);
+
+		contours = Polygon_with_holes(one_contour);
+	}
+
+
+	void ToolpathGenerator::DirectlyContourSmoothing(std::vector<Vector2d> &contour)
+	{
 		std::vector<Vector2d> smooth_contour;
 
 		for (int i = 0; i < contour.size(); i++)
@@ -164,33 +234,19 @@ namespace hpcg {
 			Vector2d p0(contour[i][0], contour[i][1]);
 			Vector2d p1(contour[(i + 1) % contour.size()][0], contour[(i + 1) % contour.size()][1]);
 			Vector2d p2(contour[(i + 2) % contour.size()][0], contour[(i + 2) % contour.size()][1]);
-
 			smooth_contour.push_back(Vector2d((p0[0] + p1[0] + p2[0]) / 3.0, (p0[1] + p1[1] + p2[1]) / 3.0));
 		}
 
-		Polygon_2 one_contour;
+		std::vector<Vector2d>().swap(contour);
 		for (int i = 0; i < smooth_contour.size(); i++)
 		{
-			one_contour.push_back(Point_2(smooth_contour[i][0], smooth_contour[i][1]));
-
+			contour.push_back(smooth_contour[i]);
 		}
-		contours.clear();
-		contours = Polygon_with_holes(one_contour);
-
-		std::vector<Vector2d>().swap(contour);
 		std::vector<Vector2d>().swap(smooth_contour);
-
 	}
 
-	void ToolpathGenerator::PolygonSmoothing()
+	void ToolpathGenerator::ContourSmoothing(std::vector<Vector2d> &contour)
 	{
-		std::vector<Vector2d> contour;
-
-		for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
-		{
-			contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
-		}
-
 		std::vector<Vector2d> sub_contour;
 
 		for (int i = 0; i < contour.size(); i++)
@@ -203,8 +259,6 @@ namespace hpcg {
 		}
 
 		std::vector<Vector2d>().swap(contour);
-
-		Polygon_2 one_contour;
 
 		for (int i = 0; i < sub_contour.size(); i++)
 		{
@@ -221,14 +275,59 @@ namespace hpcg {
 
 		for (int i = 0; i < sub_contour.size(); i++)
 		{
-			one_contour.push_back(Point_2(sub_contour[i][0], sub_contour[i][1]));
+			contour.push_back(Vector2d(sub_contour[i][0], sub_contour[i][1]));
 
 		}
 		std::vector<Vector2d>().swap(sub_contour);
+
+	}
+
+	void ToolpathGenerator::PolygonSmoothing()
+	{
+		std::vector<std::vector<Vector2d>> smooth_contour;
+
+		std::vector<Vector2d> contour;
+		for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
+		{
+			contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
+		}
+
+		ContourSmoothing(contour);
+		smooth_contour.push_back(contour);
+
 		
+		for (Polygon_with_holes::Hole_iterator hole_iter = contours.holes_begin(); hole_iter != contours.holes_end(); hole_iter++)
+		{
+			std::vector<Vector2d>().swap(contour);
+			for (Polygon_2::Vertex_iterator ver_iter = hole_iter->vertices_begin(); ver_iter != hole_iter->vertices_end(); ver_iter++)
+			{
+				contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
+			}
+			ContourSmoothing(contour);
+			smooth_contour.push_back(contour);
+		}
+		std::vector<Vector2d>().swap(contour);
+
+		//input
 		contours.clear();
 
+		Polygon_2 one_contour;
+		for (int i = 0; i < smooth_contour[0].size(); i++)
+		{
+			one_contour.push_back(Point_2(smooth_contour[0][i][0], smooth_contour[0][i][1]));
+		}
 		contours = Polygon_with_holes(one_contour);
+
+
+		for (int j = 1; j < smooth_contour.size(); j++)
+		{
+			one_contour.clear();
+			for (int i = 0; i < smooth_contour[j].size(); i++)
+			{
+				one_contour.push_back(Point_2(smooth_contour[j][i][0], smooth_contour[j][i][1]));
+			}
+			contours.add_hole(one_contour);
+		}
 
 	}
 }

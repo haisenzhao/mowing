@@ -39,7 +39,7 @@ namespace hpcg {
 				//find a minimal cost edge
 				int minimal_cost_edge_index = -1;
 				double minimal_cost = MAXDOUBLE;
-#pragma region find_a_minimal_cost_edge
+			#pragma region find_a_minimal_cost_edge
 
 				for (int j = 0; j < costs.size(); j++)
 				{
@@ -53,9 +53,7 @@ namespace hpcg {
 					}
 
 				}
-
-
-#pragma endregion
+			#pragma endregion
 
 				if (minimal_cost_edge_index < 0)
 					break;
@@ -143,6 +141,7 @@ namespace hpcg {
 			cutting_points_index[node_index].push_back(cutting_points_index_0);
 			cutting_points_index[node_index].push_back(cutting_points_index_1);
 		}
+
 
 		static void DecompositionATree(std::vector<int> &nodes, std::vector<int> &edges, std::vector<int> &connect_nodes, std::vector<int> &connect_edges, std::vector<std::vector<int>> &pathes)
 		{

@@ -1,0 +1,5 @@
+#pragma once
+#define JUMPSPEED 500
+#define DEFAULT_NOMINALSPEED 100
+#define MIN_NOMINALSPPED 20
+#define MAX_NOMINALSPEED 200

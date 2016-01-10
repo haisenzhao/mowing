@@ -30,6 +30,11 @@
 #include <CGAL/Segment_Delaunay_graph_2.h>
 #include <CGAL/Segment_Delaunay_graph_filtered_traits_2.h>
 
+#include <CGAL/Constrained_Delaunay_triangulation_2.h>
+#include <CGAL/Triangulation_face_base_with_info_2.h>
+#include <iostream>
+
+
 //#include "Circuit.h"
 
 typedef CGAL::Simple_cartesian<double> KC;
@@ -52,6 +57,27 @@ typedef CGAL::Straight_skeleton_2<K>  Ss;
 typedef boost::shared_ptr<Polygon_2> PolygonPtr;
 typedef boost::shared_ptr<Ss> SsPtr;
 typedef std::vector<PolygonPtr> PolygonPtrVector;
+
+
+struct FaceInfo2
+{
+	FaceInfo2(){}
+	int nesting_level;
+
+	bool in_domain(){
+		return nesting_level % 2 == 1;
+	}
+};
+
+typedef CGAL::Triangulation_vertex_base_2<K>                      Vb;
+typedef CGAL::Triangulation_face_base_with_info_2<FaceInfo2, K>    Fbb;
+typedef CGAL::Constrained_triangulation_face_base_2<K, Fbb>        Fb;
+typedef CGAL::Triangulation_data_structure_2<Vb, Fb>               TDS;
+typedef CGAL::Exact_predicates_tag                                Itag;
+typedef CGAL::Constrained_Delaunay_triangulation_2<K, TDS, Itag>  CDT;
+typedef CDT::Point                                                Point;
+
+
 
 #define MAXDOUBLE 1000000000.0;
 
@@ -133,7 +159,7 @@ namespace hpcg {
 			}
 			for (int i = 0; i < connecting_trunk_nodes_points.size(); i++)
 			{
-				connecting_points.push_back(connecting_trunk_nodes_points[i]);
+				//connecting_points.push_back(connecting_trunk_nodes_points[i]);
 			}
 
 			for (int i = 0; i < connecting_points.size(); i++)
@@ -150,13 +176,20 @@ namespace hpcg {
 		TMeshProcessor* m_render;
 		
 		Polygon_with_holes contours;
+		
+		double contour_size;
+		
 		std::vector<std::vector<Vector2d>> offsets;
 		std::vector<std::vector<std::vector<Vector2d>>> offsetses;
+
+		std::vector<std::vector<std::vector<Vector2d>>> offsets_parts;
+
 		std::vector<int> offset_graph;
+
 		std::vector<int> offset_degree;
 		std::vector<std::vector<int>> decompose_offset;
 
-
+		bool use_save_offset_file;
 		std::string offset_file;
 
 		std::vector<Vector2d> one_single_path;
@@ -164,6 +197,7 @@ namespace hpcg {
 		ImageSpace image_space;
 
 		double toolpath_size;
+		double input_toolpath_size;
 		int input_int_1;
 		int input_int_2;
 		int line_width;
@@ -205,17 +239,13 @@ namespace hpcg {
 		std::vector<Vector2d> turning_points_entry;
 		std::vector<Vector2d> turning_points_exit;
 
-		std::vector<Vector2d> turning_points_entry_temp;
-		std::vector<Vector2d> turning_points_exit_temp;
-
 		std::vector<Vector2d> debug_points;
-
+		std::vector<std::vector<Vector2d>> debug_lines;
 
 		double entry_d_0;
 		double exit_d_0;
 
 		std::vector<Vector2d> aaaa;
-
 
 		ToolpathGenerator();
 		void Init(TMeshProcessor* render);
@@ -235,28 +265,48 @@ namespace hpcg {
 			Vector2d input_entry_point, Vector2d input_exit_point, Vector2d &output_entry_point, Vector2d &output_exit_point);
 
 		void GenerateZigzag();
-		void GenerateZigzagForCircle();
+		void GenerateZigzagForArbitraryShape();
 		void ArchinedeanSpiral(std::vector<Vector2d> &contour);
 		void ArchinedeanSpiralSmooth(std::vector<Vector2d> &contour);
 		void ArchinedeanSpiralTrick(std::vector<Vector2d> &contour);
 
 		double ComputeNextTurningPoint(double d, double distance, int offset_index);
 
+		void ContourSmoothing(std::vector<Vector2d> &contour);
+		void DirectlyContourSmoothing(std::vector<Vector2d> &contour);
+
 		void PolygonSmoothing();
+		void OptimalDirection();
 		void DirectlyPolygonSmoothing();
-		void OutputPath(std::vector<Vector2d> &vecs, std::string path);
-		void OutputPath(std::string path);
-		void OutputPathTwoCircles();
+
 
 		//filling algorithm
 
 		void BuildOffsetGraph();
 		void FillingAlgorithmBasedOnOffsets();
 
+		void Input_Offsetses(std::string path);
+		void TurnPath();
+
+
+		//output
+		void Output_Obj(std::string path);
+		void Output_Obj_1(std::string path);
+		void OutputPath(std::vector<Vector2d> &vecs, std::string path);
+		void OutputPathTwoCircles();
+
 		void Output_tree(std::string path);
 		void Output_tree(std::vector<int> &nodes, std::vector<int> &edges, std::string path);
-
 		void Output_Offsetses(std::string path);
-		void Input_Offsetses(std::string path);
+
+		void OutputPath_Hollow(std::string path);
+
+
+
+		//triangle
+		void mark_domains(CDT& ct, CDT::Face_handle start,int index, std::list<CDT::Edge>& border);
+		void mark_domains(CDT& cdt);
+		void insert_polygon(CDT& cdt, const Polygon_2& polygon, std::vector<int> &indexInt);
+
 	};
 } 

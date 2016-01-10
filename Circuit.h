@@ -11,6 +11,8 @@
 #include <ToolpathGenerator.h>
 #include <Strip.h>
 
+#include "clipper/clipper.hpp"
+
 namespace hpcg {
 
 	class Circuit
@@ -33,7 +35,7 @@ namespace hpcg {
 			cosr = ab / a1 / b1;
 			double angle = acos(cosr);
 
-			if (a[0] * b[1] - a[1] * b[0] > 0)
+			if (a[0] * b[1] - a[1] * b[0] > 0.0)
 			{
 				angle = 2 * PI - angle;
 			}
@@ -50,12 +52,18 @@ namespace hpcg {
 			return  angle;
 		}
 
+		//multiplication cross
+		static bool MultiCross(Vector2d a, Vector2d b)
+		{
+			return (a[0] * b[1] - a[1] * b[0]) > 0.0;
+		}
+
 		//check position relation
 		static bool CheckEnclosed(std::vector<Vector2d> &input_points_0, std::vector<Vector2d> &input_points_1)
 		{
 			bool b0 = CheckInside(input_points_0[0], input_points_1);
 			bool b1 = CheckInside(input_points_1[0], input_points_0);
-	
+
 			return b0 || b1;
 		}
 
@@ -84,13 +92,39 @@ namespace hpcg {
 		//distance
 		static double Distance(Vector2d v, std::vector<Vector2d> &input_points)
 		{
-			double m_d = MAXDOUBLE;
-			for (int i = 0; i < input_points.size(); i++)
+			if (input_points.size() <= 1)
 			{
-				double d = sqrt((double)CGAL::squared_distance(Point_2(v.x, v.y), Segment_2(Point_2(input_points[i].x, input_points[i].y), Point_2(input_points[(i + 1) % input_points.size()].x, input_points[(i + 1) % input_points.size()].y))));
-				m_d = min(m_d, d);
+				if (input_points.size() == 0)
+				{
+					return MAXDOUBLE;
+
+				}
+				else
+				{
+					return Strip::Distance(v, input_points[0]);
+				}
 			}
-			return m_d;
+			else
+			{
+				double m_d = MAXDOUBLE;
+				for (int i = 0; i < input_points.size(); i++)
+				{
+					double d = sqrt((double)CGAL::squared_distance(Point_2(v.x, v.y), Segment_2(Point_2(input_points[i].x, input_points[i].y), Point_2(input_points[(i + 1) % input_points.size()].x, input_points[(i + 1) % input_points.size()].y))));
+					m_d = min(m_d, d);
+				}
+				return m_d;
+			}
+		}
+
+		static double Distance(Vector2d v, std::vector<std::vector<Vector2d> > &input_pointsese)
+		{
+			double min_d = MAXDOUBLE;
+			for (int i = 0; i < input_pointsese.size(); i++)
+			{
+				double d = Distance(v, input_pointsese[i]);
+				min_d = std::min(min_d, d);
+			}
+			return min_d;
 		}
 
 		static double Distance(Vector2d v0, Vector2d v1, std::vector<Vector2d> &input_points)
@@ -107,10 +141,38 @@ namespace hpcg {
 
 		}
 
+		static bool DistanceDouble(std::vector<Vector2d> &input_points_0, std::vector<Vector2d> &input_points_1, double toolpath_size)
+		{
+			bool b = false;
+
+			for (int i = 0; i < input_points_0.size() && !b; i++)
+			{
+				double d = Distance(input_points_0[i], input_points_0[(i + 1) % input_points_0.size()], input_points_1);
+
+				if (abs(d - toolpath_size) < 0.001)
+				{
+					b = true;
+					return true;
+				}
+			}
+			for (int i = 0; i < input_points_1.size() && !b; i++)
+			{
+				double d = Distance(input_points_1[i], input_points_1[(i + 1) % input_points_1.size()], input_points_0);
+
+				if (abs(d - toolpath_size) < 0.001)
+				{
+					b = true;
+					return true;
+				}
+			}
+
+			return b;
+		}
+
 		static double Distance(std::vector<Vector2d> &input_points_0, std::vector<Vector2d> &input_points_1)
 		{
 			double m_d = MAXDOUBLE;
-			
+
 			for (int i = 0; i < input_points_0.size(); i++)
 			{
 				double d = Distance(input_points_0[i], input_points_0[(i + 1) % input_points_0.size()], input_points_1);
@@ -121,7 +183,6 @@ namespace hpcg {
 				double d = Distance(input_points_1[i], input_points_1[(i + 1) % input_points_1.size()], input_points_0);
 				m_d = min(m_d, d);
 			}
-
 			return m_d;
 		}
 
@@ -193,33 +254,6 @@ namespace hpcg {
 
 		}
 
-		static void GenerateOffsetHole(Polygon_with_holes polygon_with_hole, double d, std::vector<std::vector<Vector2d>> &offsets)
-		{
-			PolygonPtrVector offset_polygons = CGAL::create_interior_skeleton_and_offset_polygons_2(d, polygon_with_hole);
-
-			for (PolygonPtrVector::const_iterator pi = offset_polygons.begin(); pi != offset_polygons.end(); ++pi)
-			{
-				std::vector<Vector2d> offset;
-
-				Polygon_2 poly_2;
-
-				for (Polygon_2::Vertex_const_iterator vi = (**pi).vertices_begin(); vi != (**pi).vertices_end(); ++vi)
-				{
-					offset.push_back(Vector2d((*vi).x(), (*vi).y()));
-					poly_2.push_back(Point_2((*vi).x(), (*vi).y()));
-				}
-
-				if (poly_2.is_clockwise_oriented())
-				{
-					std::reverse(offset.begin(), offset.end());
-				}
-
-
-				offsets.push_back(offset);
-				std::vector<Vector2d>().swap(offset);
-			}
-		}
-
 		static void GenerateOffset(std::vector<Vector2d> &input_points, double d, std::vector<std::vector<Vector2d>> &offsets)
 		{
 			Polygon_2 polygon;
@@ -256,13 +290,342 @@ namespace hpcg {
 			}
 		}
 
-		static void ComputeOffsets(double toolpath_size, Polygon_with_holes &contours, 
+		static void GenerateOffsetWithClipper(std::vector<Vector2d> &input_points, double d, std::vector<std::vector<Vector2d>> &offsets)
+		{
+
+			double scale = 1000000.0;
+
+			ClipperLib::Path subj;
+			ClipperLib::Paths solution;
+
+			for (int i = 0; i < input_points.size(); i++)
+			{
+				subj << ClipperLib::IntPoint(input_points[i][0] * scale, input_points[i][1] * scale);
+			}
+
+			ClipperLib::ClipperOffset co;
+			co.ArcTolerance = co.ArcTolerance*scale / 1000.0;
+			co.AddPath(subj, ClipperLib::jtRound, ClipperLib::etClosedPolygon);
+			co.Execute(solution, -d*scale);
+
+			for (int i = 0; i < solution.size(); i++)
+			{
+				std::vector<Vector2d> offset;
+
+				for (int j = 0; j < solution[i].size(); j++)
+				{
+					offset.push_back(Vector2d(((double)solution[i][j].X) / scale, ((double)solution[i][j].Y) / scale));
+				}
+				RemoveClosePoints(offset);
+
+				offsets.push_back(offset);
+
+				std::vector<Vector2d>().swap(offset);
+			}
+		}
+
+		static void GenerateOffsetForOutside(std::vector<Vector2d> &input_points, double d, std::vector<std::vector<Vector2d>> &offsets)
+		{
+			Polygon_2 polygon;
+
+			for (int i = 0; i < input_points.size(); i++)
+			{
+				polygon.push_back(Point_2(input_points[i][0], input_points[i][1]));
+			}
+
+			if (polygon.is_simple())
+			{
+				if (!polygon.is_clockwise_oriented())
+				{
+					polygon.reverse_orientation();
+				}
+
+				PolygonPtrVector offset_polygons = CGAL::create_interior_skeleton_and_offset_polygons_2(d, polygon);
+
+				for (PolygonPtrVector::const_iterator pi = offset_polygons.begin(); pi != offset_polygons.end(); ++pi)
+				{
+					std::vector<Vector2d> offset;
+
+					for (Polygon_2::Vertex_const_iterator vi = (**pi).vertices_begin(); vi != (**pi).vertices_end(); ++vi)
+					{
+						offset.push_back(Vector2d((*vi).x(), (*vi).y()));
+					}
+					offsets.push_back(offset);
+					std::vector<Vector2d>().swap(offset);
+				}
+			}
+			else
+			{
+				assert(false);
+			}
+		}
+
+		static void GenerateOffsetForOutsideWithClipper(std::vector<Vector2d> &input_points, double d, std::vector<std::vector<Vector2d>> &offsets)
+		{
+			//using namespace ClipperLib;
+
+			double scale = 1000000.0;
+
+			ClipperLib::Path subj;
+			ClipperLib::Paths solution;
+
+			for (int i = 0; i < input_points.size(); i++)
+			{
+				subj << ClipperLib::IntPoint(input_points[i][0] * scale, input_points[i][1] * scale);
+			}
+
+			ClipperLib::ClipperOffset co;
+			co.ArcTolerance = co.ArcTolerance*scale / 1000.0;
+			co.AddPath(subj, ClipperLib::jtRound, ClipperLib::etClosedPolygon);
+			co.Execute(solution, d*scale);
+
+			for (int i = 0; i < solution.size(); i++)
+			{
+				std::vector<Vector2d> offset;
+
+				for (int j = 0; j < solution[i].size(); j++)
+				{
+					offset.push_back(Vector2d(((double)solution[i][j].X) / scale, ((double)solution[i][j].Y) / scale));
+				}
+				RemoveClosePoints(offset);
+
+				offsets.push_back(offset);
+
+				std::vector<Vector2d>().swap(offset);
+			}
+		}
+
+		static void GenerateOffsetHole(Polygon_with_holes polygon_with_hole, double d, std::vector<std::vector<Vector2d>> &offsets)
+		{
+			PolygonPtrVector offset_polygons = CGAL::create_interior_skeleton_and_offset_polygons_2(d, polygon_with_hole);
+
+			for (PolygonPtrVector::const_iterator pi = offset_polygons.begin(); pi != offset_polygons.end(); ++pi)
+			{
+				std::vector<Vector2d> offset;
+
+				Polygon_2 poly_2;
+
+				for (Polygon_2::Vertex_const_iterator vi = (**pi).vertices_begin(); vi != (**pi).vertices_end(); ++vi)
+				{
+					offset.push_back(Vector2d((*vi).x(), (*vi).y()));
+					poly_2.push_back(Point_2((*vi).x(), (*vi).y()));
+				}
+
+				if (poly_2.is_clockwise_oriented())
+				{
+					std::reverse(offset.begin(), offset.end());
+				}
+
+
+				offsets.push_back(offset);
+				std::vector<Vector2d>().swap(offset);
+			}
+		}
+
+		static void GenerationOffsetWithClipper(std::vector<Vector2d> &input_points, double d, std::vector<Vector2d> &offset)
+		{
+			//using namespace ClipperLib;
+
+			double scale = 1000000.0;
+
+			ClipperLib::Path subj;
+			ClipperLib::Paths solution;
+
+			for (int i = 0; i < input_points.size(); i++)
+			{
+				subj << ClipperLib::IntPoint(input_points[i][0] * scale, input_points[i][1] * scale);
+			}
+
+			ClipperLib::ClipperOffset co;
+			co.ArcTolerance = co.ArcTolerance*scale / 1000.0;
+			co.AddPath(subj, ClipperLib::jtRound, ClipperLib::etClosedPolygon);
+			co.Execute(solution, -d*scale);
+
+			for (int i = 0; i < solution.size(); i++)
+			{
+				for (int j = 0; j < solution[i].size(); j++)
+				{
+					offset.push_back(Vector2d(((double)solution[i][j].X) / scale, ((double)solution[i][j].Y) / scale));
+				}
+				RemoveClosePoints(offset);
+				break;
+			}
+		}
+
+
+		static void RemoveClosePoints(std::vector<Vector2d> &input_points)
+		{
+			std::vector<int> remove_int;
+
+			if (input_points.size() > 2)
+			{
+				for (int i = 0; i < input_points.size() - 1; i++)
+				{
+					double d = Strip::Distance(input_points[i], input_points[(i + 1) % input_points.size()]);
+					if (d < 0.00001)
+					{
+						remove_int.push_back((i + 1) % input_points.size());
+					}
+				}
+
+				for (int i = remove_int.size() - 1; i >= 0; i--)
+				{
+					input_points.erase(input_points.begin() + remove_int[i]);
+				}
+			}
+		}
+
+		static void UniformDirection(std::vector<Vector2d> &input_points)
+		{
+			Polygon_2 polygon_2;
+
+			for (int i = 0; i < input_points.size(); i++)
+			{
+				polygon_2.push_back(Point_2(input_points[i][0], input_points[i][1]));
+			}
+
+			if (polygon_2.is_clockwise_oriented())
+			{
+				std::reverse(input_points.begin(), input_points.end());
+			}
+		}
+
+		static void GenerationOffsetsHoleWithClipper(Polygon_with_holes polygon_with_hole, double d, std::vector<std::vector<Vector2d>> &offsets)
+		{
+			//using namespace ClipperLib;
+
+			double scale = 1000000.0;
+
+			ClipperLib::ClipperOffset co;
+			co.ArcTolerance = co.ArcTolerance*scale / 1000.0;
+
+			ClipperLib::Path subj;
+			ClipperLib::Paths solution;
+			//subj << ClipperLib::IntPoint(0, 1) << ClipperLib::IntPoint(1, 1) << ClipperLib::IntPoint(1, 0) << ClipperLib::IntPoint(0, 0);
+			for (Polygon_2::Vertex_iterator ver_iter = polygon_with_hole.outer_boundary().vertices_begin(); ver_iter != polygon_with_hole.outer_boundary().vertices_end(); ver_iter++)
+			{
+				//contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
+				subj << ClipperLib::IntPoint(ver_iter->x()*scale, ver_iter->y()*scale);
+			}
+
+			co.AddPath(subj, ClipperLib::jtRound, ClipperLib::etClosedPolygon);
+
+			for (Polygon_with_holes::Hole_iterator hole_iter = polygon_with_hole.holes_begin(); hole_iter != polygon_with_hole.holes_end(); hole_iter++)
+			{
+				subj.clear();
+				for (Polygon_2::Vertex_iterator ver_iter = hole_iter->vertices_begin(); ver_iter != hole_iter->vertices_end(); ver_iter++)
+				{
+					subj << ClipperLib::IntPoint(ver_iter->x()*scale, ver_iter->y()*scale);
+				}
+				co.AddPath(subj, ClipperLib::jtRound, ClipperLib::etClosedPolygon);
+			}
+
+			co.Execute(solution, -d*scale);
+
+			for (int i = 0; i < solution.size(); i++)
+			{
+				std::vector<Vector2d> one_path;
+				for (int j = 0; j < solution[i].size(); j++)
+				{
+					one_path.push_back(Vector2d(((double)solution[i][j].X) / scale, ((double)solution[i][j].Y) / scale));
+				}
+
+				//remove very close points
+				RemoveClosePoints(one_path);
+
+				offsets.push_back(one_path);
+			}
+		}
+
+		static double MaxLengthAxis(std::vector<Vector2d> &input_points)
+		{
+			double min_x = MAXDOUBLE;
+			double min_y = MAXDOUBLE;
+			double max_x = -MAXDOUBLE;
+			double max_y = -MAXDOUBLE;
+
+			for (int i = 0; i < input_points.size(); i++)
+			{
+				min_x = min(min_x, (double)input_points[i][0]);
+				min_y = min(min_y, (double)input_points[i][1]);
+				max_x = max(max_x, (double)input_points[i][0]);
+				max_y = max(max_y, (double)input_points[i][1]);
+			}
+
+			if (max_x - min_x > max_y - min_y)
+			{
+				return max_x - min_x;
+			}
+			else
+			{
+				return max_y - min_y;
+			}
+		}
+		static double MinLengthAxis(std::vector<Vector2d> &input_points)
+		{
+			double min_x = MAXDOUBLE;
+			double min_y = MAXDOUBLE;
+			double max_x = -MAXDOUBLE;
+			double max_y = -MAXDOUBLE;
+
+			for (int i = 0; i < input_points.size(); i++)
+			{
+				min_x = min(min_x, (double)input_points[i][0]);
+				min_y = min(min_y, (double)input_points[i][1]);
+				max_x = max(max_x, (double)input_points[i][0]);
+				max_y = max(max_y, (double)input_points[i][1]);
+			}
+
+			if (max_x - min_x > max_y - min_y)
+			{
+				return max_y - min_y;
+			}
+			else
+			{
+				return max_x - min_x;
+			}
+		}
+
+		static void RemoveMinimalOffsets(std::vector<std::vector<Vector2d>> &offsets, double toolpath_size)
+		{
+			std::vector<int> remove_int;
+
+			for (int i = 0; i < offsets.size(); i++)
+			{
+				if (offsets[i].size() <= 2)
+				{
+					remove_int.push_back(i);
+				}
+				else
+				{
+					if (MinLengthAxis(offsets[i])<toolpath_size)
+					{
+						std::vector<Vector2d> offset;
+						GenerationOffsetWithClipper(offsets[i], toolpath_size / 2.0, offset);
+						if (offset.size() == 0)
+						{
+							remove_int.push_back(i);
+						}
+					}
+				}
+			}
+
+			for (int i = remove_int.size() - 1; i >= 0; i--)
+			{
+				offsets.erase(offsets.begin() + remove_int[i]);
+			}
+		}
+
+		static void ComputeOffsets(double toolpath_size, Polygon_with_holes &contours,
 			std::vector<std::vector<Vector2d>> &offsets, std::vector<std::vector<std::vector<Vector2d>>> &offsetses)
 		{
 			double lOffset = toolpath_size / 2.0;
 			std::vector<std::vector<Vector2d>> one_pathes;
-			Circuit::GenerateOffsetHole(contours, lOffset, one_pathes);
+			//Circuit::GenerateOffsetHole(contours, lOffset, one_pathes);
 
+			GenerationOffsetsHoleWithClipper(contours, lOffset, one_pathes);
+
+			//RemoveMinimalOffsets(one_pathes, toolpath_size);
 			while (one_pathes.size() > 0)
 			{
 				std::cout << "Offsets index: " << offsets.size() << std::endl;
@@ -281,12 +644,13 @@ namespace hpcg {
 				std::vector<std::vector<Vector2d>>().swap(one_pathes);
 
 				lOffset = lOffset + toolpath_size;
-				Circuit::GenerateOffsetHole(contours, lOffset, one_pathes);
+				GenerationOffsetsHoleWithClipper(contours, lOffset, one_pathes);
+				//RemoveMinimalOffsets(one_pathes, toolpath_size);
 			}
-
-
-
 		}
+
+
+
 
 		static void ComputeOffsets(double toolpath_size, std::vector<Vector2d> &contour, std::vector<std::vector<Vector2d>> &offsets)
 		{
@@ -738,7 +1102,7 @@ namespace hpcg {
 			Vector2d v = GetOnePointFromOffset(d, input_points);
 
 			int index = Strip::CheckSamePoint(v, input_points);
-			
+
 			if (index >= 0)
 			{
 				Vector2d v0 = input_points[(index + input_points.size() - 1) % input_points.size()];
@@ -760,7 +1124,7 @@ namespace hpcg {
 			else
 			{
 
-				Vector2d v1,v2;
+				Vector2d v1, v2;
 				bool b = false;
 
 				double total_length = GetTotalLength(input_points);
@@ -773,7 +1137,7 @@ namespace hpcg {
 					{
 						v1 = input_points[i];
 						v2 = input_points[(i + 1) % input_points.size()];
-					
+
 						b = true;
 						break;
 					}
@@ -806,7 +1170,6 @@ namespace hpcg {
 				Vector2d v1 = input_points[(index + input_points.size() + 1) % input_points.size()];
 
 				double angle = AnglePI(Vector2d(v0[0] - v[0], v0[1] - v[1]), Vector2d(v1[0] - v[0], v1[1] - v[1]));
-
 				double delta = DeltaDEuclideanDistance(d, distance / sin(angle), input_points);
 
 				if (delta >= 0)
@@ -817,6 +1180,32 @@ namespace hpcg {
 				{
 					return DeltaDEuclideanDistance(d, distance, input_points);
 				}
+
+				/*
+				double middle_d = d + 0.5;
+				if (middle_d > 1.0)
+				middle_d = middle_d - 1.0;
+
+				std::vector<Vector2d> part;
+				Circuit::SelectOnePartOffset(input_points, d, middle_d, part);
+
+				double start_d = distance;
+				for (int i = 0; i < 10; i++)
+				{
+				start_d = start_d + distance / 10.0;
+
+				double delta = DeltaDEuclideanDistance(d, start_d, input_points);
+				Vector2d v_delta = Circuit::GetOnePointFromOffset(delta, input_points);
+				double temp_distance = Strip::DistanceLines(v_delta, part);
+				if (temp_distance >= distance)
+				{
+				break;
+				}
+				}
+
+				return DeltaDEuclideanDistance(d, start_d, input_points);
+				*/
+
 			}
 			else
 			{
@@ -824,10 +1213,18 @@ namespace hpcg {
 			}
 		}
 
-		static void FindOptimalEntryExitPoints(double toolpath_size,std::vector<Vector2d> &offset, Vector2d &entry_point, Vector2d &exit_point)
+
+		static void FindOptimalEntryExitPoints(double toolpath_size, std::vector<Vector2d> &offset, Vector2d &entry_point, Vector2d &exit_point, std::vector<Vector2d> &debug_points)
 		{
 			double m_d = MAXDOUBLE;
 			int m_d_index = -1;
+
+			double m_d_0 = MAXDOUBLE;
+			int m_d_index_0 = -1;
+
+			double m_d_1 = MAXDOUBLE;
+			int m_d_index_1 = -1;
+
 
 			for (int i = 0; i < offset.size(); i++)
 			{
@@ -836,6 +1233,13 @@ namespace hpcg {
 				Vector2d v2 = offset[(i + 1 + offset.size()) % offset.size()];
 
 				double angle = Circuit::Angle2PI(Vector2d(v0[0] - v1[0], v0[1] - v1[1]), Vector2d(v2[0] - v1[0], v2[1] - v1[1]));
+
+				if (abs(angle - PI) < m_d_1)
+				{
+					m_d_1 = abs(angle - PI);
+					m_d_index_1 = i;
+				}
+
 				if (angle <= PI)
 				{
 					if (abs(angle - PI / 2.0) < m_d)
@@ -844,12 +1248,115 @@ namespace hpcg {
 						m_d_index = i;
 					}
 				}
+
+				if (angle <= PI / 2.0)
+				{
+					if (abs(angle - PI / 2.0) < m_d_0)
+					{
+						m_d_0 = abs(angle - PI / 2.0);
+						m_d_index_0 = i;
+					}
+				}
 			}
 
-			entry_point = offset[m_d_index];
+			if (m_d_index_0 >= 0 || m_d_index >= 0)
+			{
+				if (m_d_index_0 >= 0)
+				{
+					entry_point = offset[m_d_index_0];
+				}
+				else
+				{
+					entry_point = offset[m_d_index];
+				}
+			}
+			else
+			{
+				entry_point = offset[m_d_index_1];
+			}
+
 			double d = Circuit::FindNearestPointPar(entry_point, offset);
 			double entry_point_d = Circuit::DeltaDistance(d, toolpath_size, offset);
 			exit_point = Circuit::GetOnePointFromOffset(entry_point_d, offset);
+
+		}
+		static void FindOptimalEntryExitPoints(double toolpath_size, std::vector<Vector2d> &offset, std::vector<Vector2d> &next_offset, Vector2d &entry_point, Vector2d &exit_point, std::vector<Vector2d> &debug_points)
+		{
+			std::vector<std::vector<Vector2d>> offset_0_pathes;
+			std::vector<std::vector<Vector2d>> offset_1_pathes;
+			DetectSharingPart0(toolpath_size, offset, next_offset, offset_0_pathes, offset_1_pathes);
+			std::vector<std::vector<Vector2d>>().swap(offset_1_pathes);
+
+			double m_d = MAXDOUBLE;
+			int m_d_index = -1;
+
+			double m_d_0 = MAXDOUBLE;
+			int m_d_index_0 = -1;
+
+			double m_d_1 = MAXDOUBLE;
+			int m_d_index_1 = -1;
+
+
+			for (int i = 0; i < offset.size(); i++)
+			{
+				double d0 = Distance(offset[i], offset_0_pathes);
+
+				if (d0 < 0.0001)
+				{
+					Vector2d v0 = offset[(i - 1 + offset.size()) % offset.size()];
+					Vector2d v1 = offset[i];
+					Vector2d v2 = offset[(i + 1 + offset.size()) % offset.size()];
+
+					double angle = Circuit::Angle2PI(Vector2d(v0[0] - v1[0], v0[1] - v1[1]), Vector2d(v2[0] - v1[0], v2[1] - v1[1]));
+
+					if (abs(angle - PI) < m_d_1)
+					{
+						m_d_1 = abs(angle - PI);
+						m_d_index_1 = i;
+					}
+
+					if (angle <= PI)
+					{
+						if (abs(angle - PI / 2.0) < m_d)
+						{
+							m_d = abs(angle - PI / 2.0);
+							m_d_index = i;
+						}
+					}
+
+					if (angle <= PI / 2.0)
+					{
+						if (abs(angle - PI / 2.0) < m_d_0)
+						{
+							m_d_0 = abs(angle - PI / 2.0);
+							m_d_index_0 = i;
+						}
+					}
+				}
+			}
+
+			if (m_d_index_0 >= 0 || m_d_index >= 0)
+			{
+				if (m_d_index_0 >= 0)
+				{
+					entry_point = offset[m_d_index_0];
+				}
+				else
+				{
+					entry_point = offset[m_d_index];
+				}
+			}
+			else
+			{
+				entry_point = offset[m_d_index_1];
+			}
+
+			double d = Circuit::FindNearestPointPar(entry_point, offset);
+			double entry_point_d = Circuit::DeltaDistance(d, toolpath_size, offset);
+			exit_point = Circuit::GetOnePointFromOffset(entry_point_d, offset);
+
+			std::vector<std::vector<Vector2d>>().swap(offset_0_pathes);
+
 		}
 
 		static Vector2d DetectNearestPoint(Vector2d v0, Vector2d v1, std::vector<Vector2d> &input_points)
@@ -868,7 +1375,7 @@ namespace hpcg {
 					vecs.push_back(Vector2d(ipoint->x(), ipoint->y()));
 				}
 			}
-		
+
 			assert(vecs.size() != 0);
 
 			double min_d = Strip::Distance(v0, vecs[0]);
@@ -876,7 +1383,7 @@ namespace hpcg {
 
 			for (int i = 1; i < vecs.size(); i++)
 			{
-				double d = Strip::Distance(v0,vecs[i]);
+				double d = Strip::Distance(v0, vecs[i]);
 
 				if (d < min_d)
 				{
@@ -888,20 +1395,61 @@ namespace hpcg {
 			return vecs[index];
 		}
 
-		static void ComputeNextEntryExitPointForOuter(double toolpath_size, std::vector<Vector2d> &outside_offset,std::vector<Vector2d> &inside_offset, 
+		static void ComputeNextEntryExitPointForOuter(double toolpath_size, std::vector<Vector2d> &outside_offset, std::vector<Vector2d> &inside_offset,
 			Vector2d &entry_point, Vector2d &exit_point, Vector2d &next_entry_point, Vector2d &next_exit_point)
 		{
 
 			Vector2d n(exit_point[0] - entry_point[0], exit_point[1] - entry_point[1]);
-			Vector2d pn(-n[1],n[0]);
+			Vector2d pn(-n[1], n[0]);
 
 			next_entry_point = DetectNearestPoint(entry_point, Vector2d(entry_point[0] + pn[0], entry_point[1] + pn[1]), inside_offset);
 			next_exit_point = DetectNearestPoint(exit_point, Vector2d(exit_point[0] + pn[0], exit_point[1] + pn[1]), inside_offset);
 		}
 
+		//	static void ComputeNextEntryExitPointForOuter(std::vector<Vector2d> &input_points, Vector2d &)
 
+		static Vector2d FindNearestPoint(Vector2d &v, std::vector<Vector2d> &input_points)
+		{
+			double d = Circuit::FindNearestPointPar(v,input_points);
+			return Circuit::GetOnePointFromOffset(d,input_points);
+		}
 
-		static void ComputeNextEntryExitPointForInner(double toolpath_size, std::vector<Vector2d> &outside_offset,std::vector<Vector2d> &inside_offset,
+		static Vector2d FindNearestPoint(std::vector<Vector2d> &input_points, Vector2d &ray_start, Vector2d &ray_end)
+		{
+			std::vector<Vector2d> vecs;
+			for (int i = 0; i < input_points.size(); i++)
+			{
+				Vector2d v0 = input_points[i];
+				Vector2d v1 = input_points[(i + 1) % input_points.size()];
+
+				CGAL::Object result = CGAL::intersection(Segment_2(Point_2(v0[0], v0[1]), Point_2(v1[0], v1[1])), Line_2(Point_2(ray_start[0], ray_start[1]), Point_2(ray_end[0], ray_end[1])));
+
+				if (const Point_2 *ipoint = CGAL::object_cast<Point_2>(&result))
+				{
+					vecs.push_back(Vector2d(ipoint->x(), ipoint->y()));
+				}
+			}
+
+			assert(vecs.size() != 0);
+
+			double min_d = Strip::Distance(vecs[0], ray_end);
+			int min_index = 0;
+
+			for (int i = 1; i < vecs.size(); i++)
+			{
+				double d = Strip::Distance(vecs[i], ray_end);
+				if (d < min_d)
+				{
+					min_d = d;
+					min_index = i;
+				}
+			}
+			Vector2d v = vecs[min_index];
+			std::vector<Vector2d>().swap(vecs);
+			return v;
+		}
+
+		static void ComputeNextEntryExitPointForInner(double toolpath_size, std::vector<Vector2d> &outside_offset, std::vector<Vector2d> &inside_offset,
 			Vector2d &entry_point, Vector2d &exit_point, Vector2d &next_entry_point, Vector2d &next_exit_point)
 		{
 			double entry_d_1 = Circuit::FindNearestPointPar(entry_point, inside_offset);
@@ -923,67 +1471,45 @@ namespace hpcg {
 
 				if (n_0[0] * n_1[1] - n_0[1] * n_1[0]>0)
 				{
-					double temp = Circuit::DeltaDistance(entry_d_1, toolpath_size, inside_offset);
+					if (index_0 >= 0)
+					{
+						double temp = Circuit::DeltaDistance(entry_d_1, toolpath_size, inside_offset);
+						if (temp >= 0)
+							exit_d_1 = temp;
+					}
+					else
+					{
+						//double temp = Circuit::DeltaDistance(exit_d_1, -toolpath_size, inside_offset);
+						//if (temp >= 0)
+						//	entry_d_1 = temp;
+					}
 
-					if (temp >= 0)
-						exit_d_1 = temp;
 				}
 				else
 				{
-					double temp = Circuit::DeltaDistance(exit_d_1, toolpath_size, inside_offset);
-					if (temp >= 0)
-						entry_d_1 = temp;
-				}
+					if (index_1 >= 0)
+					{
+						double temp = Circuit::DeltaDistance(exit_d_1, toolpath_size, inside_offset);
+						if (temp >= 0)
+							entry_d_1 = temp;
+					}
+					else
+					{
+						//	double temp = Circuit::DeltaDistance(entry_d_1, -toolpath_size, inside_offset);
+						//	if (temp >= 0)
+						//	exit_d_1 = temp;
+					}
 
+				}
 				entry_p_1 = Circuit::GetOnePointFromOffset(entry_d_1, inside_offset);
 				exit_p_1 = Circuit::GetOnePointFromOffset(exit_d_1, inside_offset);
 			}
+
+
+
+
 			next_entry_point = entry_p_1;
 			next_exit_point = exit_p_1;
-		}
-
-
-		//for fermat spiral generation
-		static Line_2 GetRelatedLine(Vector2d v, std::vector<Vector2d> &input_points, std::vector<Vector2d> &debug_points)
-		{
-			assert(Distance(v, input_points)<0.0001);
-
-			Line_2 line_2;
-
-			int index = Strip::CheckSamePoint(v, input_points);
-
-			if (index >= 0)
-			{
-				Vector2d v1 = input_points[(index + input_points.size() - 1) % input_points.size()];
-				line_2 = Line_2(Point_2(v[0], v[1]), Point_2(v1[0], v1[1]));
-			}
-			else
-			{
-				double d = GetTotalLength(input_points);
-				double par = FindNearestPointPar(v, input_points);
-				double length = 0.0;
-				for (int i = 0; i < input_points.size(); i++)
-				{
-					double l = sqrt((double)CGAL::squared_distance(Point_2(input_points[i].x, input_points[i].y), Point_2(input_points[(i + 1) % input_points.size()].x, input_points[(i + 1) % input_points.size()].y)));
-
-					if (length / d < par&&par < (length + l) / d)
-					{
-						Vector2d v1 = input_points[i];
-						Vector2d v2 = input_points[(i + input_points.size() - 1) % input_points.size()];
-
-
-						Vector2d v3 = v;
-						v3[0] = v3[0] + v2[0] - v1[0];
-						v3[1] = v3[1] + v2[1] - v1[1];
-
-						line_2 = Line_2(Point_2(v[0], v[1]), Point_2(v3[0], v3[1]));
-
-						break;
-					}
-					length += l;
-				}
-			}
-			return line_2;
 		}
 
 
@@ -1037,7 +1563,7 @@ namespace hpcg {
 
 			Line_2 line_2;
 
-			if (index>=0)
+			if (index >= 0)
 			{
 				Vector2d v0 = input_points[(index + input_points.size() - 1) % input_points.size()];
 				Vector2d v1 = input_points[(index + input_points.size() + 1) % input_points.size()];
@@ -1066,7 +1592,7 @@ namespace hpcg {
 					{
 						Vector2d v0 = input_points[i];
 						Vector2d v1 = input_points[(i + 1) % input_points.size()];
-						
+
 						line_2 = Line_2(Point_2(v0[0], v0[1]), Point_2(v1[0], v1[1]));
 						break;
 					}
@@ -1093,7 +1619,7 @@ namespace hpcg {
 				//double par = (trunk_node.connecting_points[i] + trunk_node.connecting_points[i + 1]) / 2.0;
 
 				Vector2d v0 = Circuit::GetOnePointFromOffset(trunk_node.connecting_points[i], input_points);
-				Vector2d v1 = Circuit::GetOnePointFromOffset(trunk_node.connecting_points[i+1], input_points);
+				Vector2d v1 = Circuit::GetOnePointFromOffset(trunk_node.connecting_points[i + 1], input_points);
 				Vector2d v3((v0[0] + v1[0]) / 2.0, (v0[1] + v1[1]) / 2.0);
 				double par = Circuit::FindNearestPointPar(v3, input_points);
 
@@ -1137,7 +1663,7 @@ namespace hpcg {
 					trunk_node.connecting_points_pairs.push_back(cur_par_index + 1);
 					trunk_node.connecting_points_pairs.push_back(next_par_index);
 				}
-			
+
 			}
 			std::vector<double>().swap(cutting_points_par);
 		}
@@ -1147,7 +1673,7 @@ namespace hpcg {
 			std::vector<std::vector<Vector2d>> &pathes, std::vector<int> &connecting)
 		{
 			std::vector<double> cutting_points_par;
-		
+
 			for (int i = 0; i < cutting_points.size(); i = i + 2)
 			{
 				double par = (cutting_points[i] + cutting_points[i + 1]) / 2.0;
@@ -1198,135 +1724,190 @@ namespace hpcg {
 			}
 			std::vector<double>().swap(cutting_points_par);
 		}
-	
-
-		static bool SharingPart(std::vector<Vector2d> &main_offset, std::vector<Vector2d> &check_offset, double &offset_start, double &offset_end, std::vector<std::vector<Vector2d>> &pathes_temp)
-		{
-			int index = -1;
-
-			for (int i = 0; i < main_offset.size(); i++)
-			{
-				double d0 = Distance(main_offset[i], check_offset);
-				double d1 = Distance(main_offset[(i + 1) % main_offset.size()], check_offset);
-
-				if (d0 > 0.00001&&d1<0.00001)
-				{
-					index = (i + 1) % main_offset.size();
-					break;
-				}
-			}
 
 
-
-			if (index < 0)
-			{
-				offset_start = 0.0;
-				offset_end = 1.0;
-				return true;
-			}
-
-			offset_start = FindNearestPointPar(main_offset[index], main_offset);
-
-			int i = (index + 1) % main_offset.size();
-			do
-			{
-				double d = Distance(main_offset[i], check_offset);
-
-				if (d > 0.00001||i==index)
-				{
-					break;
-				}
-				i = (i + 1) % main_offset.size();
-			} while (true);
-			
-			i = (i + main_offset.size()- 1) % main_offset.size();
-
-			offset_end = FindNearestPointPar(main_offset[i], main_offset);
-
-			return false;
-		}
-
-		static void DetectSharingPartEnclose(double toolpath_size, std::vector<Vector2d> &outside_offset, std::vector<Vector2d> &inside_offset,
-			double &outside_offset_start, double &outside_offset_end, double &inside_offset_start, double &inside_offset_end, std::vector<std::vector<Vector2d>> &pathes_temp)
-		{
-			std::vector<Vector2d> offset;
-			GenerateOffsetForOutside(inside_offset, toolpath_size, offset);
-
-			bool b = SharingPart(outside_offset, offset, outside_offset_start, outside_offset_end, pathes_temp);
-
-			if (b)
-			{
-				inside_offset_start = 0.0;
-				inside_offset_end = 1.0;
-			}
-			else
-			{
-				Vector2d v0 = GetOnePointFromOffset(outside_offset_start, outside_offset);
-				Vector2d v1 = GetOnePointFromOffset(outside_offset_end, outside_offset);
-
-				inside_offset_start = FindNearestPointPar(v0,inside_offset);
-				inside_offset_end = FindNearestPointPar(v1, inside_offset);
-			}
-
-			std::vector<Vector2d>().swap(offset);
-		}
-
-		static void DetectSharingPart(double toolpath_size, std::vector<Vector2d> &offset_0, std::vector<Vector2d> &offset_1,
-			double &offset_0_start, double &offset_0_end, double &offset_1_start, double &offset_1_end, std::vector<std::vector<Vector2d>> &pathes_temp)
+		static void DetectSharingPart0(double toolpath_size, std::vector<Vector2d> &offset_0, std::vector<Vector2d> &offset_1,
+			std::vector<std::vector<Vector2d>> &offset_0_path, std::vector<std::vector<Vector2d>> &offset_1_path)
 		{
 			bool b0 = CheckInside(offset_0[0], offset_1);
 			bool b1 = CheckInside(offset_1[0], offset_0);
 
 			if (b0)
 			{
-				DetectSharingPartEnclose(toolpath_size, offset_1, offset_0, offset_1_start, offset_1_end, offset_0_start, offset_0_end, pathes_temp);
+				GenerateOffsetForOutsideWithClipper(offset_0, toolpath_size, offset_1_path);
+				GenerateOffsetWithClipper(offset_1, toolpath_size, offset_0_path);
 			}
 
 			if (b1)
 			{
-				DetectSharingPartEnclose(toolpath_size, offset_0, offset_1, offset_0_start, offset_0_end, offset_1_start, offset_1_end, pathes_temp);
+				GenerateOffsetForOutsideWithClipper(offset_1, toolpath_size, offset_0_path);
+				GenerateOffsetWithClipper(offset_0, toolpath_size, offset_1_path);
 			}
 
 			if (!b0&&!b1)
 			{
-				std::vector<Vector2d> offset;
-				GenerateOffsetForOutside(offset_0, toolpath_size, offset);
-
-				bool b = SharingPart(offset_1, offset, offset_1_start, offset_1_end, pathes_temp);
-
-				Vector2d v0 = GetOnePointFromOffset(offset_1_start, offset_1);
-				Vector2d v1 = GetOnePointFromOffset(offset_1_end, offset_1);
-
-				offset_0_start = FindNearestPointPar(v0, offset_0);
-				offset_0_end = FindNearestPointPar(v1, offset_0);
-
-				std::vector<Vector2d>().swap(offset);
+				GenerateOffsetForOutsideWithClipper(offset_0, toolpath_size, offset_1_path);
+				GenerateOffsetForOutsideWithClipper(offset_1, toolpath_size, offset_0_path);
 			}
 		}
 
-		static void ConnectTwoTrunkNodes(double toolpath_size, std::vector<Vector2d> &offset0, std::vector<Vector2d> &offset1,
+		static void  OffsetRelatedContour(double offset_distance, std::vector<Vector2d> &offset, Polygon_with_holes &contours,
+			std::vector<std::vector<Vector2d>> &offset_parts,
+			std::vector<Vector2d> &debug_points, std::vector<std::vector<Vector2d>> &debug_lines)
+		{
+			debug_lines.push_back(offset);
+
+			//get contour points
+			std::vector<std::vector<Vector2d>> contour_points;
+			std::vector<Vector2d> contour;
+			for (Polygon_2::Vertex_iterator ver_iter = contours.outer_boundary().vertices_begin(); ver_iter != contours.outer_boundary().vertices_end(); ver_iter++)
+			{
+				contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
+			}
+			contour_points.push_back(contour);
+
+			for (Polygon_with_holes::Hole_iterator hole_iter = contours.holes_begin(); hole_iter != contours.holes_end(); hole_iter++)
+			{
+				std::vector<Vector2d>().swap(contour);
+				for (Polygon_2::Vertex_iterator ver_iter = hole_iter->vertices_begin(); ver_iter != hole_iter->vertices_end(); ver_iter++)
+				{
+					contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
+				}
+				contour_points.push_back(contour);
+			}
+			std::vector<Vector2d>().swap(contour);
+
+
+			//initial offset_related_contour_index
+			std::vector<std::vector<int>> offset_related_contour_index(offset.size(), std::vector<int>());
+			std::vector<std::vector<Vector2d>> offset_related_contour_point(offset.size(), std::vector<Vector2d>());
+			std::vector<bool>  offset_related_contour_used(offset.size(), true);
+			std::vector<int> cutting_point_index;
+
+			for (int i = 0; i < offset.size(); i++)
+			{
+				for (int j = 0; j < contour_points.size(); j++)
+				{
+					double d0 = Circuit::Distance(offset[i], contour_points[j]);
+					double d1 = abs(d0 - offset_distance);
+					if (d1<0.01)
+					{
+						offset_related_contour_index[i].push_back(j);
+						Vector2d v = Circuit::FindNearestPoint(offset[i], contour_points[j]);
+						offset_related_contour_point[i].push_back(v);
+					}
+				}
+				assert(offset_related_contour_index[i].size() == 1 || offset_related_contour_index[i].size() == 2);
+				if (offset_related_contour_index[i].size() == 2)
+				{
+					Vector2d v0 = offset_related_contour_point[i][0];
+					Vector2d v1 = offset_related_contour_point[i][1];
+
+					if (Distance(v0, v1, offset) < 0.01)
+					{
+						offset_related_contour_used[i] = false;
+					}
+					else
+					{
+						debug_points.push_back(offset[i]);
+						debug_points.push_back(v0);
+						debug_points.push_back(v1);
+
+						cutting_point_index.push_back(i);
+					}
+				}
+			}
+
+			//get the related parts
+			std::vector<std::vector<double>> offset_related_contour_parts(contour_points.size(), std::vector<double>());
+
+
+			if (cutting_point_index.size()==0)
+			{
+				offset_related_contour_parts[0].push_back(0.0);
+				offset_related_contour_parts[0].push_back(1.0);
+			}
+			else
+			{
+				for (int i = 0; i < cutting_point_index.size(); i++)
+				{
+					int start_index = cutting_point_index[i];
+					int next_index = cutting_point_index[(i + 1) % cutting_point_index.size()];
+
+					if (next_index != (start_index + 1) % offset.size())
+					{
+						int related_index = offset_related_contour_index[(start_index + 1) % offset.size()][0];
+
+						Vector2d start_index_point, next_index_point;
+
+						if (offset_related_contour_index[start_index][0] == related_index)
+						{
+							start_index_point = offset_related_contour_point[start_index][0];
+						}
+						else
+						{
+							start_index_point = offset_related_contour_point[start_index][1];
+						}
+
+
+						if (offset_related_contour_index[next_index][0] == related_index)
+						{
+							next_index_point = offset_related_contour_point[next_index][0];
+						}
+						else
+						{
+							next_index_point = offset_related_contour_point[next_index][1];
+						}
+						offset_related_contour_parts[related_index].push_back(Circuit::FindNearestPointPar(next_index_point, contour_points[related_index]));
+						offset_related_contour_parts[related_index].push_back(Circuit::FindNearestPointPar(start_index_point, contour_points[related_index]));
+					}
+				}
+			}
+
+			for (int i = 0; i < offset_related_contour_parts.size(); i++)
+			{
+				for (int j = 0; j < offset_related_contour_parts[i].size(); j = j + 2)
+				{
+					std::vector<Vector2d> one_path;
+					Circuit::SelectOnePartOffset(contour_points[i], offset_related_contour_parts[i][j], offset_related_contour_parts[i][j + 1], one_path);
+					//debug_lines.push_back(one_path);
+					offset_parts.push_back(one_path);
+				}
+			}
+
+
+			std::vector<std::vector<double>>().swap(offset_related_contour_parts);
+			std::vector<int>().swap(cutting_point_index);
+			std::vector<std::vector<int>>().swap(offset_related_contour_index);
+			std::vector<std::vector<Vector2d>>().swap(offset_related_contour_point);
+			std::vector<bool>().swap(offset_related_contour_used);
+			std::vector<std::vector<Vector2d>>().swap(contour_points);
+		}
+
+		static bool PointsOnSharingEdge(Vector2d v, std::vector<std::vector<Vector2d>> &offsets_parts_0,
+			std::vector<std::vector<Vector2d>> &offsets_parts_1 )
+		{
+
+
+			Circuit::FindNearestPoint()
+
+		}
+
+
+		static bool ConnectTwoTrunkNodes(double toolpath_size, std::vector<Vector2d> &offset0, std::vector<Vector2d> &offset1,
 			int trunk_node_index_0, int trunk_node_index_1,
 			TrunkNode &trunk_node_0, TrunkNode &trunk_node_1,
-			std::vector<std::vector<Vector2d>> &pathes, std::vector<std::vector<Vector2d>> &pathes_temp, std::vector<Vector2d> &debug_points)
+			std::vector<std::vector<Vector2d>> &offsets_parts_0,
+			std::vector<std::vector<Vector2d>> &offsets_parts_1,
+			std::vector<Vector2d> &debug_points, std::vector<std::vector<Vector2d>> &debug_lines)
 		{
-			double offset_0_start;
-			double offset_0_end;
-			double offset_1_start;
-			double offset_1_end;
+			std::vector<std::vector<Vector2d>> offset_0_pathes;
+			std::vector<std::vector<Vector2d>> offset_1_pathes;
+			DetectSharingPart0(toolpath_size, offset0, offset1, offset_0_pathes, offset_1_pathes);
 
-			DetectSharingPart(toolpath_size, offset0, offset1, offset_0_start, offset_0_end, offset_1_start, offset_1_end, pathes_temp);
-
-			std::vector<Vector2d> offset_0_path;
-			SelectOnePartOffset(offset0, offset_0_end, offset_0_start, offset_0_path);
-			//pathes_temp.push_back(offset_0_path);
-	
-			std::vector<Vector2d> offset_1_path;
-			SelectOnePartOffset(offset1, offset_1_end, offset_1_start, offset_1_path);
-			//pathes_temp.push_back(offset_1_path);
 
 			bool b = false;
-
-			for (int i = 0; i < trunk_node_0.connecting_leaf_nodes_points.size()&&!b; i = i + 2)
+			for (int i = 0; i < trunk_node_0.connecting_leaf_nodes_points.size() && !b; i = i + 2)
 			{
 				double cp_0 = trunk_node_0.connecting_leaf_nodes_points[i];
 				double cp_1 = trunk_node_0.connecting_leaf_nodes_points[i + 1];
@@ -1334,8 +1915,9 @@ namespace hpcg {
 				Vector2d v0 = GetOnePointFromOffset(cp_0, offset0);
 				Vector2d v1 = GetOnePointFromOffset(cp_1, offset0);
 
-				double d0 = Strip::Distance(v0, offset_0_path);
-				double d1 = Strip::Distance(v1, offset_0_path);
+				double d0 = Distance(v0, offset_0_pathes);
+				double d1 = Distance(v1, offset_0_pathes);
+
 
 				if (d0 < 0.00001&&d1 < 0.00001)
 				{
@@ -1346,33 +1928,8 @@ namespace hpcg {
 					Vector2d next_exit_point;
 
 					ComputeNextEntryExitPointForInner(toolpath_size, offset0, offset1, v0, v00, next_entry_point, next_exit_point);
-					
-					//turning_points_entry_temp.push_back(v0);
-					//turning_points_exit_temp.push_back(v00);
 
-					//turning_points_entry_temp.push_back(next_entry_point);
-					//turning_points_exit_temp.push_back(next_exit_point);
 					b = true;
-
-					//cutting_points_0.push_back(d00);
-					//cutting_points_0.push_back(cp_0);
-
-					//cutting_points_1.push_back(Circuit::FindNearestPointPar(next_exit_point, offset1));
-					//cutting_points_1.push_back(Circuit::FindNearestPointPar(next_entry_point, offset1));
-					
-					/*
-					std::vector<Vector2d> one_path;
-					one_path.push_back(v0);
-					one_path.push_back(next_entry_point);
-					pathes.push_back(one_path);
-					std::vector<Vector2d>().swap(one_path);
-					one_path.push_back(v00);
-					one_path.push_back(next_exit_point);
-					pathes.push_back(one_path);
-					*/
-
-					//int cutting_index_0, int cutting_index_1,
-					//std::vector<int> &cutting_points_index_0, std::vector<int> &cutting_points_index_1,
 
 					trunk_node_0.connecting_trunk_nodes_points.push_back(d00);
 					trunk_node_0.connecting_trunk_nodes_points.push_back(cp_0);
@@ -1395,60 +1952,28 @@ namespace hpcg {
 
 			for (int i = 0; i < trunk_node_1.connecting_leaf_nodes_points.size() && !b; i = i + 2)
 			{
-
 				double cp_0 = trunk_node_1.connecting_leaf_nodes_points[i];
 				double cp_1 = trunk_node_1.connecting_leaf_nodes_points[i + 1];
 				Vector2d v0 = GetOnePointFromOffset(cp_0, offset1);
 				Vector2d v1 = GetOnePointFromOffset(cp_1, offset1);
-				double d0 = Strip::Distance(v0, offset_1_path);
-				double d1 = Strip::Distance(v1, offset_1_path);
-				
+
+
+				double d0 = Distance(v0, offset_1_pathes);
+				double d1 = Distance(v1, offset_1_pathes);
+
 				if (d0 < 0.00001&&d1 < 0.00001)
 				{
 
 					double d11 = DeltaDEuclideanDistance(cp_1, -toolpath_size, offset1);
 					Vector2d v11 = GetOnePointFromOffset(d11, offset1);
 
-					//turning_points_entry_temp.push_back(v1);
-					//turning_points_exit_temp.push_back(v11);
 
 					Vector2d next_entry_point;
 					Vector2d next_exit_point;
 
 					ComputeNextEntryExitPointForOuter(toolpath_size, offset1, offset0, v1, v11, next_entry_point, next_exit_point);
-					//turning_points_entry_temp.push_back(next_entry_point);
-					//turning_points_exit_temp.push_back(next_exit_point);
 
 					b = true;
-
-
-					//debug_points.push_back(v1);
-					//debug_points.push_back(v11);
-					//debug_points.push_back(next_entry_point);
-					//debug_points.push_back(next_exit_point);
-					
-					
-					//cutting_points_1.push_back(cp_1);
-					//cutting_points_1.push_back(d11);
-
-					//cutting_points_0.push_back(Circuit::FindNearestPointPar(next_entry_point, offset0));
-					//cutting_points_0.push_back(Circuit::FindNearestPointPar(next_exit_point, offset0));
-
-					/*
-					std::vector<Vector2d> one_path;
-					one_path.push_back(v1);
-					one_path.push_back(next_entry_point);
-					pathes.push_back(one_path);
-					std::vector<Vector2d>().swap(one_path);
-					one_path.push_back(v11);
-					one_path.push_back(next_exit_point);
-					pathes.push_back(one_path);
-					*/
-
-					//int cutting_index_0, int cutting_index_1,
-					//std::vector<int> &cutting_points_index_0, std::vector<int> &cutting_points_index_1,
-
-
 
 					trunk_node_1.connecting_trunk_nodes_points.push_back(cp_1);
 					trunk_node_1.connecting_trunk_nodes_points.push_back(d11);
@@ -1469,8 +1994,99 @@ namespace hpcg {
 				}
 			}
 
-			std::vector<Vector2d>().swap(offset_0_path);
-			std::vector<Vector2d>().swap(offset_1_path);
+
+			for (int i = 0; i < trunk_node_0.connecting_trunk_nodes_points.size() && !b; i = i + 2)
+			{
+				double cp_0 = trunk_node_0.connecting_trunk_nodes_points[i];
+				double cp_1 = trunk_node_0.connecting_trunk_nodes_points[i + 1];
+
+				Vector2d v0 = GetOnePointFromOffset(cp_0, offset0);
+				Vector2d v1 = GetOnePointFromOffset(cp_1, offset0);
+
+				double d0 = Distance(v0, offset_0_pathes);
+				double d1 = Distance(v1, offset_0_pathes);
+
+				if (d0 < 0.00001&&d1 < 0.00001)
+				{
+					double d00 = DeltaDEuclideanDistance(cp_0, toolpath_size, offset0);
+					Vector2d v00 = GetOnePointFromOffset(d00, offset0);
+
+					Vector2d next_entry_point;
+					Vector2d next_exit_point;
+
+					ComputeNextEntryExitPointForInner(toolpath_size, offset0, offset1, v0, v00, next_entry_point, next_exit_point);
+
+					b = true;
+
+					trunk_node_0.connecting_trunk_nodes_points.push_back(d00);
+					trunk_node_0.connecting_trunk_nodes_points.push_back(cp_0);
+
+					trunk_node_1.connecting_trunk_nodes_points.push_back(Circuit::FindNearestPointPar(next_exit_point, offset1));
+					trunk_node_1.connecting_trunk_nodes_points.push_back(Circuit::FindNearestPointPar(next_entry_point, offset1));
+
+					trunk_node_0.connecting_trunk_nodes_id.push_back(trunk_node_index_1);
+					trunk_node_0.connecting_trunk_nodes_id.push_back(trunk_node_1.connecting_trunk_nodes_points.size() - 2);
+					trunk_node_0.connecting_trunk_nodes_id.push_back(trunk_node_index_1);
+					trunk_node_0.connecting_trunk_nodes_id.push_back(trunk_node_1.connecting_trunk_nodes_points.size() - 1);
+
+					trunk_node_1.connecting_trunk_nodes_id.push_back(trunk_node_index_0);
+					trunk_node_1.connecting_trunk_nodes_id.push_back(trunk_node_0.connecting_trunk_nodes_points.size() - 2);
+					trunk_node_1.connecting_trunk_nodes_id.push_back(trunk_node_index_0);
+					trunk_node_1.connecting_trunk_nodes_id.push_back(trunk_node_0.connecting_trunk_nodes_points.size() - 1);
+
+				}
+			}
+
+
+			for (int i = 0; i < trunk_node_1.connecting_trunk_nodes_points.size() && !b; i = i + 2)
+			{
+				double cp_0 = trunk_node_1.connecting_trunk_nodes_points[i];
+				double cp_1 = trunk_node_1.connecting_trunk_nodes_points[i + 1];
+				Vector2d v0 = GetOnePointFromOffset(cp_0, offset1);
+				Vector2d v1 = GetOnePointFromOffset(cp_1, offset1);
+
+
+				double d0 = Distance(v0, offset_1_pathes);
+				double d1 = Distance(v1, offset_1_pathes);
+
+				if (d0 < 0.00001&&d1 < 0.00001)
+				{
+
+					double d11 = DeltaDEuclideanDistance(cp_1, -toolpath_size, offset1);
+					Vector2d v11 = GetOnePointFromOffset(d11, offset1);
+
+
+					Vector2d next_entry_point;
+					Vector2d next_exit_point;
+
+					ComputeNextEntryExitPointForOuter(toolpath_size, offset1, offset0, v1, v11, next_entry_point, next_exit_point);
+
+					b = true;
+
+					trunk_node_1.connecting_trunk_nodes_points.push_back(cp_1);
+					trunk_node_1.connecting_trunk_nodes_points.push_back(d11);
+
+					trunk_node_0.connecting_trunk_nodes_points.push_back(Circuit::FindNearestPointPar(next_entry_point, offset0));
+					trunk_node_0.connecting_trunk_nodes_points.push_back(Circuit::FindNearestPointPar(next_exit_point, offset0));
+
+					trunk_node_1.connecting_trunk_nodes_id.push_back(trunk_node_index_0);
+					trunk_node_1.connecting_trunk_nodes_id.push_back(trunk_node_0.connecting_trunk_nodes_points.size() - 2);
+					trunk_node_1.connecting_trunk_nodes_id.push_back(trunk_node_index_0);
+					trunk_node_1.connecting_trunk_nodes_id.push_back(trunk_node_0.connecting_trunk_nodes_points.size() - 1);
+
+					trunk_node_0.connecting_trunk_nodes_id.push_back(trunk_node_index_1);
+					trunk_node_0.connecting_trunk_nodes_id.push_back(trunk_node_1.connecting_trunk_nodes_points.size() - 2);
+					trunk_node_0.connecting_trunk_nodes_id.push_back(trunk_node_index_1);
+					trunk_node_0.connecting_trunk_nodes_id.push_back(trunk_node_1.connecting_trunk_nodes_points.size() - 1);
+
+				}
+			}
+
+
+			std::vector<std::vector<Vector2d>>().swap(offset_0_pathes);
+			std::vector<std::vector<Vector2d>>().swap(offset_1_pathes);
+
+			return b;
 		}
 
 	};

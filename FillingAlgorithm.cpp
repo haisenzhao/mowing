@@ -5,7 +5,91 @@
 #include "Circuit.h"
 #include "tree.h"
 
+#include "ToolPathTimeEstimator/ToolPathTimeEstimator.hpp"
+
 namespace hpcg {
+
+
+	void ToolpathGenerator::TurnPath()
+	{
+
+		double length = 10.0;
+		double angle = PI*0.75;
+		int subdivision_nb = 30;
+
+		Vector2d start_p(length*cos(angle), length*sin(angle));
+		Vector2d end_p(length,0.0);
+
+		FILE *out;
+
+		fopen_s(&out, "D://123.stat", "w");
+
+		std::ofstream file("D://456.txt");
+
+
+		int iii = 0;
+
+		for (double delta = 0.0; delta <= 1.0; delta = delta + 0.01)
+		{
+			iii++;
+
+			if (iii == 25)
+			{
+				int dsad = 10;
+			}
+
+			std::vector<Vector2d> path;
+			if (delta < 0.01)
+			{
+				path.push_back(start_p);
+				path.push_back(Vector2d(start_p[0] * 0.8, start_p[1] * 0.8));
+				path.push_back(Vector2d(start_p[0] * 0.4, start_p[1] * 0.4));
+				path.push_back(Vector2d(0.0, 0.0));
+				path.push_back(Vector2d(end_p[0] * 0.4, end_p[1] * 0.4));
+				path.push_back(Vector2d(end_p[0] * 0.8, end_p[1] * 0.8));
+				path.push_back(end_p);
+			}
+			else
+			{
+				path.push_back(start_p);
+				
+				Vector2d center(delta / cos(angle / 2.0)*cos(angle / 2.0), delta / cos(angle / 2.0)*sin(angle / 2.0));
+
+				double radius = delta*tan(angle/2.0);
+
+				for (double a = 0.5*PI + angle; a <=1.5*PI; a = a + (PI-angle) / subdivision_nb)
+				{
+					path.push_back(Vector2d(center[0] + radius*cos(a), center[1]+radius*sin(a)));
+				}
+
+				path.push_back(end_p);
+			
+			}
+
+			ToolPathTimeEstimator est = ToolPathTimeEstimator();
+
+			std::vector<std::vector<Vector2d>>().swap(debug_lines);
+
+			debug_lines.push_back(path);
+
+			for (int i = 0; i < path.size(); i++)
+			{
+				est.addBlock(path[i][0], path[i][1]);
+			}
+
+			
+			double time = est.calculate(out);
+			std::cout << iii << " : " << delta<<"mm :  time :" <<time<<"s" << std::endl;
+
+			file << delta << " " << time << " " << Strip::GetTotalLength(path) << std::endl;
+
+			std::vector<Vector2d>().swap(path);
+		}
+
+		file.clear();
+		file.close();
+	}
+
 
 	void ToolpathGenerator::Output_Offsetses(std::string path)
 	{
@@ -80,86 +164,14 @@ namespace hpcg {
 	}
 
 
-	void ToolpathGenerator::Output_tree(std::string path)
-	{
-		std::ofstream file(path);
-
-		file << "Mark Newman on Sat Jul 22 05:32:16 2006" << std::endl;
-		file << "graph" << std::endl;
-		file << "[" << std::endl;
-		file << "  directed 0" << std::endl;
-
-		for (int i = 0; i < offsets.size(); i++)
-		{
-			file << "node" << std::endl;
-			file << "[" << std::endl;
-			file << "id " << i << std::endl;
-			file << "label " << i << std::endl;
-			file << "]" << std::endl;
-		}
-
-
-		for (int i = 0; i < offset_graph.size(); i = i + 2)
-		{
-			int index_0 = offset_graph[i];
-			int index_1 = offset_graph[i+1];
-
-			file << "edge" << std::endl;
-			file << "[" << std::endl;
-
-			file << "source " << index_0 << std::endl;
-			file << "target " << index_1 << std::endl;
-
-			file << "]" << std::endl;
-		}
-
-		file << "]" << std::endl;
-
-		file.clear();
-		file.close();
-	}
-	
-	void ToolpathGenerator::Output_tree(std::vector<int> &nodes, std::vector<int> &edges, std::string path)
-	{
-		std::ofstream file(path);
-
-		file << "Mark Newman on Sat Jul 22 05:32:16 2006" << std::endl;
-		file << "graph" << std::endl;
-		file << "[" << std::endl;
-		file << "  directed 0" << std::endl;
-
-
-		for (int i = 0; i < nodes.size(); i++)
-		{
-			file << "node" << std::endl;
-			file << "[" << std::endl;
-			file << "id " << nodes[i] << std::endl;
-			file << "label " << nodes[i] << std::endl;
-
-			file << "]" << std::endl;
-		}
-
-		for (int i = 0; i < edges.size(); i=i+2)
-		{
-			file << "edge" << std::endl;
-			file << "[" << std::endl;
-
-			file << "source " << edges[i] << std::endl;
-			file << "target " << edges[i+1] << std::endl;
-
-			file << "]" << std::endl;
-		}
-
-		file << "]" << std::endl;
-
-		file.clear();
-		file.close();
-	}
-
 	void ToolpathGenerator::BuildOffsetGraph()
 	{
 		//build offset graph
 		std::vector<int> index_int;
+
+		//Circuit::OffsetRelatedContour(offsets[27], contours, debug_points, debug_lines);
+
+		double offset_distance = toolpath_size / 2.0;
 
 		int index = -1;
 		for (int i = 0; i < offsetses.size(); i++)
@@ -170,7 +182,14 @@ namespace hpcg {
 				index_int.push_back(i);
 				index_int.push_back(j);
 				index_int.push_back(index);
+
+				std::vector<std::vector<Vector2d>> offset_parts;
+				Circuit::OffsetRelatedContour(offset_distance, offsets[index], contours, offset_parts, debug_points, debug_lines);
+				offsets_parts.push_back(offset_parts);
+
+				std::vector<std::vector<Vector2d>>().swap(offset_parts);
 			}
+			offset_distance += toolpath_size;
 		}
 
 		for (int i = 0; i < offsetses.size() - 1; i++)
@@ -179,8 +198,9 @@ namespace hpcg {
 			{
 				for (int k = 0; k < offsetses[i + 1].size(); k++)
 				{
-					double d = Circuit::Distance(offsetses[i + 1][k], offsetses[i][j]);
-					if (abs(d - toolpath_size) < 0.0001)
+					bool b = Circuit::DistanceDouble(offsetses[i + 1][k], offsetses[i][j],toolpath_size);
+
+					if (b)
 					{
 						int index_0 = -1;
 						int index_1 = -1;
@@ -229,18 +249,54 @@ namespace hpcg {
 			PolygonSmoothing();
 			DirectlyPolygonSmoothing();
 		}
-
-		std::ifstream file(offset_file, std::ios::in);
-
-		if (!file)
+		
+		if (use_save_offset_file)
 		{
-			Circuit::ComputeOffsets(toolpath_size, contours, offsets, offsetses);
-			Output_Offsetses(offset_file);
+			std::ifstream file(offset_file, std::ios::in);
+			if (!file)
+			{
+				Circuit::ComputeOffsets(toolpath_size, contours, offsets, offsetses);
+
+				for (int i = 0; i < offsets.size(); i++)
+				{
+					Circuit::UniformDirection(offsets[i]);
+				}
+
+				for (int i = 0; i < offsetses.size(); i++)
+				{
+					for (int j = 0; j < offsetses.size(); j++)
+					{
+						Circuit::UniformDirection(offsetses[i][j]);
+					}
+				}
+
+				Output_Offsetses(offset_file);
+			}
+			else
+			{
+				Input_Offsetses(offset_file);
+			}
 		}
 		else
 		{
-			Input_Offsetses(offset_file);
+			Circuit::ComputeOffsets(toolpath_size, contours, offsets, offsetses);
+			for (int i = 0; i < offsets.size(); i++)
+			{
+				Circuit::UniformDirection(offsets[i]);
+			}
+
+			for (int i = 0; i < offsetses.size(); i++)
+			{
+				for (int j = 0; j < offsetses[i].size(); j++)
+				{
+					Circuit::UniformDirection(offsetses[i][j]);
+				}
+			}
+
 		}
+
+		if (debug_int_0 == 100)
+			return;
 
 		BuildOffsetGraph();
 
@@ -286,16 +342,49 @@ namespace hpcg {
 
 		Output_tree(nodes, connect_edges, "D:\\3.gml");
 
-
 		//all cutting points are on trunk node
-		std::vector<std::vector<double>> cutting_points;
-
-		for (int i = 0; i < connect_nodes.size(); i++)
-		{
-			cutting_points.push_back(std::vector<double>());
-		}
 
 		std::vector<int> connecting_pathes;
+
+		if (connect_nodes.size() == 0)
+		{
+
+			Vector2d input_entry_point, input_exit_point;
+			Vector2d output_entry_point, output_exit_point;
+			Circuit::FindOptimalEntryExitPoints(toolpath_size, offsets[0], input_entry_point, input_exit_point,debug_points);
+
+			//generate Fermat spiral
+			FermatsSpiralTrick(offsets, input_entry_point, input_exit_point, output_entry_point, output_exit_point);
+
+			entry_spirals.push_back(entry_spiral);
+			exit_spirals.push_back(exit_spiral);
+
+			std::reverse(exit_spiral.begin(), exit_spiral.end());
+
+			pathes.push_back(entry_spiral);
+			pathes.push_back(exit_spiral);
+
+			for (int i = 0; i < entry_spiral.size(); i++)
+			{
+				one_single_path.push_back(entry_spiral[i]);
+			}
+
+			for (int i = 0; i < exit_spiral.size(); i++)
+			{
+				one_single_path.push_back(exit_spiral[i]);
+			}
+
+			std::vector<int>().swap(connect_edges);
+			std::vector<int>().swap(connect_nodes);
+			std::vector<double>().swap(costs);
+			std::vector<int>().swap(mst);
+			std::vector<int>().swap(nodes);
+			std::vector<int>().swap(edges);
+			return;
+		}
+
+		if (debug_int_0 == -100)
+			return;
 
 		//turning_points_entry
 		for (int i = 0; i < decompose_offset.size(); i++)
@@ -314,11 +403,13 @@ namespace hpcg {
 				{
 					offsets0.push_back(offsets[decompose_offset[i][l]]);
 				}
+
 				int next_index = Tree::NextNode(mst, decompose_offset[i]);
 
 				Vector2d input_entry_point, input_exit_point;
 				Vector2d output_entry_point, output_exit_point;
-				Circuit::FindOptimalEntryExitPoints(toolpath_size, offsets[decompose_offset[i][0]], input_entry_point, input_exit_point);
+				Circuit::FindOptimalEntryExitPoints(toolpath_size, offsets[decompose_offset[i][0]], input_entry_point, input_exit_point, debug_points);
+
 
 				//generate Fermat spiral
 				FermatsSpiralTrick(offsets0, input_entry_point, input_exit_point, output_entry_point, output_exit_point);
@@ -367,6 +458,8 @@ namespace hpcg {
 				std::vector<std::vector<Vector2d>>().swap(offsets0);
 				std::vector<Vector2d>().swap(entry_spiral);
 				std::vector<Vector2d>().swap(exit_spiral);
+
+
 			}
 			else
 			{
@@ -381,7 +474,7 @@ namespace hpcg {
 
 				Vector2d input_entry_point, input_exit_point;
 				Vector2d output_entry_point, output_exit_point;
-				Circuit::FindOptimalEntryExitPoints(toolpath_size, offsets[decompose_offset[i][decompose_offset[i].size() - 1]], input_entry_point, input_exit_point);
+				Circuit::FindOptimalEntryExitPoints(toolpath_size, offsets0[0], offsets[next_index], input_entry_point, input_exit_point, debug_points);
 
 				//generate Fermat spiral
 				FermatsSpiralTrick(offsets0, input_entry_point, input_exit_point, output_entry_point, output_exit_point);
@@ -389,8 +482,22 @@ namespace hpcg {
 				//get connecting points
 
 				Vector2d connecting_entry_point, connecting_exit_point;
-				Circuit::ComputeNextEntryExitPointForOuter(toolpath_size, offsets0[0], offsets[next_index],
+	
+				if (entry_spiral.size() >= 2 && exit_spiral.size() >= 2)
+				{
+					//connecting_entry_point = Circuit::FindNearestPoint(offsets[next_index], entry_spiral[1], entry_spiral[0]);
+					//connecting_exit_point = Circuit::FindNearestPoint(offsets[next_index], exit_spiral[1], exit_spiral[0]);
+
+					Circuit::ComputeNextEntryExitPointForOuter(toolpath_size, offsets0[0], offsets[next_index],
+						input_entry_point, input_exit_point, connecting_entry_point, connecting_exit_point);
+				}
+				else
+				{
+					Circuit::ComputeNextEntryExitPointForOuter(toolpath_size, offsets0[0], offsets[next_index],
 					input_entry_point, input_exit_point, connecting_entry_point, connecting_exit_point);
+				}
+
+
 				double entry_d = Circuit::FindNearestPointPar(connecting_entry_point, offsets[next_index]);
 				double exit_d = Circuit::FindNearestPointPar(connecting_exit_point, offsets[next_index]);
 
@@ -450,20 +557,61 @@ namespace hpcg {
 		if (debug_int_0>=0)
 		return;
 
-		//connect sub-region to offset mst tree
-		for (int i = 0; i < connect_edges.size(); i=i+2)
-		{
-			int node_index_0 = connect_edges[i];
-			int node_index_1 = connect_edges[i + 1];
+		//return;
 
-			int trunk_node_id_0 = GetTrunkNodeId(trunk_nodes, connect_edges[i]);
-			int trunk_node_id_1 = GetTrunkNodeId(trunk_nodes, connect_edges[i+1]);
-			
-			Circuit::ConnectTwoTrunkNodes(toolpath_size, offsets[node_index_0], offsets[node_index_1],
-				trunk_node_id_0, trunk_node_id_1,
-				trunk_nodes[trunk_node_id_0], trunk_nodes[trunk_node_id_1],
-				pathes, pathes_temp, debug_points);
+		//connect sub-region to offset mst tree
+		std::vector<bool> connect_edeges_success;
+		for (int i = 0; i < connect_edges.size(); i = i + 2)
+		{
+			connect_edeges_success.push_back(false);
 		}
+
+		do
+		{
+
+			for (int i = 0; i < connect_edges.size(); i = i + 2)
+			{
+				if (!connect_edeges_success[i / 2])
+				{
+					int node_index_0 = connect_edges[i];
+					int node_index_1 = connect_edges[i + 1];
+
+					int trunk_node_id_0 = GetTrunkNodeId(trunk_nodes, connect_edges[i]);
+					int trunk_node_id_1 = GetTrunkNodeId(trunk_nodes, connect_edges[i + 1]);
+
+					bool b = Circuit::ConnectTwoTrunkNodes(toolpath_size, offsets[node_index_0], offsets[node_index_1],
+						trunk_node_id_0, trunk_node_id_1,
+						offsets_parts[node_index_0], offsets_parts[node_index_1],
+						trunk_nodes[trunk_node_id_0], trunk_nodes[trunk_node_id_1],
+						debug_points, debug_lines);
+
+					if (b)
+					{
+						connect_edeges_success[i / 2] = true;
+					}
+				}
+				break;
+			}
+
+			bool goon = false;
+			for (int i = 0; i < connect_edeges_success.size(); i++)
+			{
+				if (!connect_edeges_success[i])
+				{
+					goon = true;
+				}
+			}
+
+			if (!goon)
+			{
+				break;
+			}
+
+			break;
+
+		} while (true);
+
+		return;
 
 		for (int i = 0; i < trunk_nodes.size(); i++)
 		{
@@ -471,9 +619,8 @@ namespace hpcg {
 			Circuit::CutACircuit(offsets[trunk_nodes[i].related_offset_id],trunk_nodes[i]);
 		}
 
+	
 		//get one single path
-
-
 		#pragma region one_single_path
 
 		int pathes_nb = pathes.size();
@@ -496,6 +643,7 @@ namespace hpcg {
 			}
 		}
 
+		return;
 		//compute edges connecting pathes.
 		for (int i = 0; i < trunk_nodes.size(); i++)
 		{
@@ -740,7 +888,6 @@ namespace hpcg {
 
 		#pragma endregion
 
-		std::vector<std::vector<double>>().swap(cutting_points);
 		std::vector<int>().swap(connect_edges);
 		std::vector<int>().swap(connect_nodes);
 		std::vector<double>().swap(costs);
