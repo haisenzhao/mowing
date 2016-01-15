@@ -83,7 +83,8 @@ namespace hpcg {
 				double l0 = sqrt((double)CGAL::squared_distance(Point_2(v[0], v[1]), p0));
 				double l1 = sqrt((double)CGAL::squared_distance(Point_2(v[0], v[1]), p1));
 
-				if (min_d<l0 &&min_d<l1)
+				if (min_d<l0 &&min_d<l1&&abs(min_d - l0)>0.0001&&abs(min_d - l1)>0.0001)
+				//if (min_d<l0 &&min_d<l1)
 				{
 					double l = sqrt((double)CGAL::squared_distance(p0, p1));
 					if (l < 0.00001)
@@ -164,6 +165,25 @@ namespace hpcg {
 			return m_d;
 		}
 
+		static double Distance(Vector2d v, Vector2d v1, Vector2d v2)
+		{
+			return sqrt((double)CGAL::squared_distance(Point_2(v.x, v.y), Segment_2(Point_2(v1.x, v1.y), Point_2(v2.x, v2.y))));
+		}
+
+
+		static double Distance(Vector2d v0, Vector2d v1, std::vector<Vector2d> &input_points)
+		{
+			double m_d = MAXDOUBLE;
+
+			for (int i = 0; i < input_points.size()-1; i++)
+			{
+				double d = sqrt((double)CGAL::squared_distance(Segment_2(Point_2(v0.x, v0.y), Point_2(v1.x, v1.y)), Segment_2(Point_2(input_points[i].x, input_points[i].y), Point_2(input_points[(i + 1) % input_points.size()].x, input_points[(i + 1) % input_points.size()].y))));
+				m_d = min(m_d, d);
+			}
+			return m_d;
+
+		}
+
 		static double DistanceLines(Vector2d v, std::vector<Vector2d> &input_points)
 		{
 			double m_d = MAXDOUBLE;
@@ -181,25 +201,47 @@ namespace hpcg {
 			return Strip::GetOnePointFromStrip(d, input_points);
 		}
 
+		static Vector2d FindNearestPoint(Vector2d &v, Vector2d v1, Vector2d v2)
+		{
+			std::vector<Vector2d> input_points;
+			input_points.push_back(v1);
+			input_points.push_back(v2);
+			double d = Strip::FindNearestPointPar(v, input_points);
+			return Strip::GetOnePointFromStrip(d, input_points);
+		}
+
 		static Vector2d FindNearestPoint(Vector2d &v, std::vector<std::vector<Vector2d>> &input_points)
 		{
 			Vector2d nearest_p;
 			double min_d = MAXDOUBLE;
 			for (int i = 0; i < input_points.size(); i++)
 			{
-				Vector2d near_p = FindNearestPoint(v, input_points[i]);
-				double d = Distance(near_p,v);
-
-				if (d < min_d)
+				if (input_points[i].size() == 1)
 				{
+					Vector2d near_p = input_points[i][0];
+					double d = Distance(near_p, v);
 
-
-
-					min_d = d;
+					if (d < min_d)
+					{
+						nearest_p = near_p;
+						min_d = d;
+					}
 				}
-			}
-		}
+				else
+				{
+					Vector2d near_p = FindNearestPoint(v, input_points[i]);
+					double d = Distance(near_p, v);
 
+					if (d < min_d)
+					{
+						nearest_p = near_p;
+						min_d = d;
+					}
+				}
+
+			}
+			return nearest_p;
+		}
 
 		static double GetTotalLength(std::vector<Vector2d> &input_points)
 		{

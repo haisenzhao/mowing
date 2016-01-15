@@ -224,7 +224,6 @@ namespace hpcg {
 		contours = Polygon_with_holes(one_contour);
 	}
 
-
 	void ToolpathGenerator::DirectlyContourSmoothing(std::vector<Vector2d> &contour)
 	{
 		std::vector<Vector2d> smooth_contour;

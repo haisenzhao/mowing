@@ -159,7 +159,7 @@ namespace hpcg {
 			}
 			for (int i = 0; i < connecting_trunk_nodes_points.size(); i++)
 			{
-				//connecting_points.push_back(connecting_trunk_nodes_points[i]);
+				connecting_points.push_back(connecting_trunk_nodes_points[i]);
 			}
 
 			for (int i = 0; i < connecting_points.size(); i++)
@@ -185,6 +185,7 @@ namespace hpcg {
 		std::vector<std::vector<std::vector<Vector2d>>> offsets_parts;
 
 		std::vector<int> offset_graph;
+		std::vector<std::vector<Vector2d>> offset_graph_sharing_parts;
 
 		std::vector<int> offset_degree;
 		std::vector<std::vector<int>> decompose_offset;
@@ -193,8 +194,15 @@ namespace hpcg {
 		std::string offset_file;
 
 		std::vector<Vector2d> one_single_path;
+		std::vector<bool> one_single_path_boundary;
+
+		std::vector<std::vector<Vector2d>> boundary_path;
 
 		ImageSpace image_space;
+
+		double graph_scale;
+		double graph_move_x;
+		double graph_move_y;
 
 		double toolpath_size;
 		double input_toolpath_size;
@@ -260,9 +268,13 @@ namespace hpcg {
 
 		//offset fermat spiral
 		void FermatSpiral(std::vector<Vector2d> &contour, Vector2d input_entry_point, Vector2d input_exit_point);
-
+		void FermatSpiral(std::vector<Vector2d> &contour, double entry_d_0, double exit_d_0);
+		
 		void FermatsSpiralTrick(std::vector<std::vector<Vector2d>> &local_offsets, 
 			Vector2d input_entry_point, Vector2d input_exit_point, Vector2d &output_entry_point, Vector2d &output_exit_point);
+
+		void RichardMethod(std::vector<std::vector<Vector2d>> &local_offsets, Vector2d input_entry_point, Vector2d input_exit_point, Vector2d &output_entry_point, Vector2d &output_exit_point);
+
 
 		void GenerateZigzag();
 		void GenerateZigzagForArbitraryShape();
@@ -302,11 +314,20 @@ namespace hpcg {
 		void OutputPath_Hollow(std::string path);
 
 
-
+		void OutputPathDirectly(std::vector<Vector2d> &vecs, std::string path);
+		
 		//triangle
 		void mark_domains(CDT& ct, CDT::Face_handle start,int index, std::list<CDT::Edge>& border);
 		void mark_domains(CDT& cdt);
 		void insert_polygon(CDT& cdt, const Polygon_2& polygon, std::vector<int> &indexInt);
 
+		void GetSharingParts(int index_id_0, int index_id_1, int &offsets_parts_index_0, int &offsets_parts_index_1);
+
+		void FermatsSpiralSmooth(std::vector<std::vector<Vector2d>> &local_offsets, Vector2d input_entry_point, Vector2d input_exit_point
+			, Vector2d &output_entry_point, Vector2d &output_exit_point);
+
+
+		void BoundaryTag();
+
 	};
-} 
+}

@@ -647,10 +647,15 @@ namespace hpcg {
 				GenerationOffsetsHoleWithClipper(contours, lOffset, one_pathes);
 				//RemoveMinimalOffsets(one_pathes, toolpath_size);
 			}
+
+			//add small offsets
+			lOffset = lOffset - toolpath_size / 2.0;
+			std::vector<std::vector<Vector2d>>().swap(one_pathes);
+
+			GenerationOffsetsHoleWithClipper(contours, lOffset, one_pathes);
+			//RemoveMinimalOffsets(one_pathes, toolpath_size);
+
 		}
-
-
-
 
 		static void ComputeOffsets(double toolpath_size, std::vector<Vector2d> &contour, std::vector<std::vector<Vector2d>> &offsets)
 		{
@@ -705,10 +710,8 @@ namespace hpcg {
 				}
 			}
 
-
 			if (min_i >= 0)
 			{
-
 				double length = 0.0;
 				for (int i = 0; i < min_i; i++)
 				{
@@ -721,7 +724,7 @@ namespace hpcg {
 				double l0 = sqrt((double)CGAL::squared_distance(Point_2(v[0], v[1]), p0));
 				double l1 = sqrt((double)CGAL::squared_distance(Point_2(v[0], v[1]), p1));
 
-				if (min_d<l0 &&min_d<l1)
+				if (min_d<l0 &&min_d<l1&&abs(min_d - l0)>0.0001&&abs(min_d - l1)>0.0001)
 				{
 					double l = sqrt((double)CGAL::squared_distance(p0, p1));
 					if (l < 0.00001)
@@ -1234,6 +1237,7 @@ namespace hpcg {
 
 				double angle = Circuit::Angle2PI(Vector2d(v0[0] - v1[0], v0[1] - v1[1]), Vector2d(v2[0] - v1[0], v2[1] - v1[1]));
 
+
 				if (abs(angle - PI) < m_d_1)
 				{
 					m_d_1 = abs(angle - PI);
@@ -1276,16 +1280,94 @@ namespace hpcg {
 			}
 
 			double d = Circuit::FindNearestPointPar(entry_point, offset);
-			double entry_point_d = Circuit::DeltaDistance(d, toolpath_size, offset);
+			//double entry_point_d = Circuit::DeltaDistance(d, toolpath_size, offset);
+			
+			double entry_point_d = DeltaDEuclideanDistance(d, toolpath_size, offset);
+
 			exit_point = Circuit::GetOnePointFromOffset(entry_point_d, offset);
 
 		}
-		static void FindOptimalEntryExitPoints(double toolpath_size, std::vector<Vector2d> &offset, std::vector<Vector2d> &next_offset, Vector2d &entry_point, Vector2d &exit_point, std::vector<Vector2d> &debug_points)
+		static void FindOptimalEntryExitPoints_Richard(double toolpath_size, std::vector<Vector2d> &offset, std::vector<Vector2d> &offset_center, Vector2d &entry_point, Vector2d &exit_point, std::vector<Vector2d> &debug_points)
 		{
-			std::vector<std::vector<Vector2d>> offset_0_pathes;
-			std::vector<std::vector<Vector2d>> offset_1_pathes;
-			DetectSharingPart0(toolpath_size, offset, next_offset, offset_0_pathes, offset_1_pathes);
-			std::vector<std::vector<Vector2d>>().swap(offset_1_pathes);
+			Vector2d center(0.0,0.0);
+
+			for (int i = 0; i < offset_center.size(); i++)
+			{
+				center[0] += offset_center[i][0];
+				center[1] += offset_center[i][1];
+			}
+
+			center[0] = center[0] / offset_center.size();
+			center[1] = center[1] / offset_center.size();
+
+			double par = Circuit::FindNearestPointPar(center, offset);
+			entry_point = Circuit::GetOnePointFromOffset(par,offset);
+
+			double d = Circuit::FindNearestPointPar(entry_point, offset);
+			//double entry_point_d = Circuit::DeltaDistance(d, toolpath_size, offset);
+
+			double entry_point_d = DeltaDEuclideanDistance(d, toolpath_size, offset);
+
+			exit_point = Circuit::GetOnePointFromOffset(entry_point_d, offset);
+
+		}
+
+		
+		static void FindOptimalEntryExitPoints(double toolpath_size, std::vector<Vector2d> &offset, std::vector<Vector2d> &next_offset,
+			std::vector<Vector2d> &offsets_parts, std::vector<Vector2d> &next_offsets_parts,
+			Vector2d &entry_point, Vector2d &exit_point, std::vector<Vector2d> &debug_points)
+		{
+			/*
+			double length = Strip::GetTotalLength(offsets_parts);
+			
+			if (length > toolpath_size)
+			{
+				double delta = toolpath_size / 2.0 / length;
+				
+				entry_point = Strip::GetOnePointFromStrip(0.5 + delta, offsets_parts);
+				double d = Circuit::FindNearestPointPar(entry_point, offset);
+				double entry_point_d = DeltaDEuclideanDistance(d, toolpath_size, offset);
+				exit_point = Circuit::GetOnePointFromOffset(entry_point_d, offset);
+			}
+			else
+			{
+				entry_point = Strip::GetOnePointFromStrip(0.5, offsets_parts);
+				double d = Circuit::FindNearestPointPar(entry_point, offset);
+				double entry_point_d = DeltaDEuclideanDistance(d, toolpath_size, offset);
+				exit_point = Circuit::GetOnePointFromOffset(entry_point_d, offset);
+			}
+
+	
+			double d0 = Strip::Distance(entry_point, next_offsets_parts);
+			double d1 = Strip::Distance(exit_point, next_offsets_parts);
+
+			if (abs(toolpath_size - d0) > 0.0001 || abs(toolpath_size - d1) > 0.0001)
+			{
+				length = Strip::GetTotalLength(next_offsets_parts);
+
+				if (length > toolpath_size)
+				{
+					double delta = toolpath_size / 2.0 / length;
+					Vector2d next_entry_point = Strip::GetOnePointFromStrip(0.5, next_offsets_parts);
+
+					debug_points.push_back(next_entry_point);
+
+					double d = Circuit::FindNearestPointPar(next_entry_point, offset);
+					double entry_point_d = DeltaDEuclideanDistance(d, toolpath_size, offset);
+					entry_point = Circuit::GetOnePointFromOffset(d, offset);
+					exit_point = Circuit::GetOnePointFromOffset(entry_point_d, offset);
+				}
+				else
+				{
+					Vector2d next_entry_point = Strip::GetOnePointFromStrip(0.5, next_offsets_parts);
+					double d = Circuit::FindNearestPointPar(next_entry_point, offset);
+					double entry_point_d = DeltaDEuclideanDistance(d, toolpath_size, offset);
+					entry_point = Circuit::GetOnePointFromOffset(d, offset);
+					exit_point = Circuit::GetOnePointFromOffset(entry_point_d, offset);
+				}
+
+			}
+			*/
 
 			double m_d = MAXDOUBLE;
 			int m_d_index = -1;
@@ -1296,12 +1378,30 @@ namespace hpcg {
 			double m_d_1 = MAXDOUBLE;
 			int m_d_index_1 = -1;
 
-
 			for (int i = 0; i < offset.size(); i++)
 			{
-				double d0 = Distance(offset[i], offset_0_pathes);
+				double d1 = Strip::Distance(offset[i], offsets_parts);
 
-				if (d0 < 0.0001)
+				double d = Circuit::FindNearestPointPar(offset[i], offset);
+				double entry_point_d = DeltaDEuclideanDistance(d, toolpath_size, offset);
+				Vector2d v_exit_point = Circuit::GetOnePointFromOffset(entry_point_d, offset);
+
+				double d2 = Strip::Distance(v_exit_point, offsets_parts);
+
+
+				Vector2d connecting_entry_point, connecting_exit_point;
+
+				bool b=Circuit::ComputeNextEntryExitPointForOuter_Richard(toolpath_size, offset, next_offset,
+					offset[i], v_exit_point, connecting_entry_point, connecting_exit_point);
+
+				double d3=100.0, d4=100.0;
+				if (b)
+				{
+					d3 = Strip::Distance(connecting_entry_point, next_offsets_parts);
+					d4 = Strip::Distance(connecting_exit_point, next_offsets_parts);
+				}
+
+				if (d1<0.0001&&d2<0.0001&&b&&d3<0.0001&&d4<0.0001)
 				{
 					Vector2d v0 = offset[(i - 1 + offset.size()) % offset.size()];
 					Vector2d v1 = offset[i];
@@ -1352,15 +1452,13 @@ namespace hpcg {
 			}
 
 			double d = Circuit::FindNearestPointPar(entry_point, offset);
-			double entry_point_d = Circuit::DeltaDistance(d, toolpath_size, offset);
+			double entry_point_d = DeltaDEuclideanDistance(d, toolpath_size, offset);
 			exit_point = Circuit::GetOnePointFromOffset(entry_point_d, offset);
-
-			std::vector<std::vector<Vector2d>>().swap(offset_0_pathes);
-
 		}
 
-		static Vector2d DetectNearestPoint(Vector2d v0, Vector2d v1, std::vector<Vector2d> &input_points)
-		{
+
+	static Vector2d DetectNearestPoint(Vector2d v0, Vector2d v1, std::vector<Vector2d> &input_points)
+			{
 			std::vector<Vector2d> vecs;
 
 			for (int i = 0; i < input_points.size(); i++)
@@ -1395,16 +1493,85 @@ namespace hpcg {
 			return vecs[index];
 		}
 
+
+	static bool DetectNearestPoint(Vector2d v0, Vector2d v1, std::vector<Vector2d> &input_points, Vector2d &output_point)
+	{
+		std::vector<Vector2d> vecs;
+
+		for (int i = 0; i < input_points.size(); i++)
+		{
+			Vector2d v2 = input_points[i];
+			Vector2d v3 = input_points[(i + 1) % input_points.size()];
+
+			CGAL::Object result = CGAL::intersection(Line_2(Point_2(v0[0], v0[1]), Point_2(v1[0], v1[1])), Segment_2(Point_2(v2[0], v2[1]), Point_2(v3[0], v3[1])));
+
+			if (const Point_2 *ipoint = CGAL::object_cast<Point_2>(&result))
+			{
+				vecs.push_back(Vector2d(ipoint->x(), ipoint->y()));
+			}
+		}
+
+		if (vecs.size() == 0)
+			return false;
+
+
+		double min_d = Strip::Distance(v0, vecs[0]);
+		int index = 0;
+
+		for (int i = 1; i < vecs.size(); i++)
+		{
+			double d = Strip::Distance(v0, vecs[i]);
+
+			if (d < min_d)
+			{
+				min_d = d;
+				index = i;
+			}
+		}
+
+		output_point=vecs[index];
+
+		return true;
+	}
+
+
+
 		static void ComputeNextEntryExitPointForOuter(double toolpath_size, std::vector<Vector2d> &outside_offset, std::vector<Vector2d> &inside_offset,
 			Vector2d &entry_point, Vector2d &exit_point, Vector2d &next_entry_point, Vector2d &next_exit_point)
 		{
-
+			/*
 			Vector2d n(exit_point[0] - entry_point[0], exit_point[1] - entry_point[1]);
 			Vector2d pn(-n[1], n[0]);
 
 			next_entry_point = DetectNearestPoint(entry_point, Vector2d(entry_point[0] + pn[0], entry_point[1] + pn[1]), inside_offset);
 			next_exit_point = DetectNearestPoint(exit_point, Vector2d(exit_point[0] + pn[0], exit_point[1] + pn[1]), inside_offset);
+			*/
+
+			next_entry_point=Circuit::FindNearestPoint(entry_point, inside_offset);
+			next_exit_point = Circuit::FindNearestPoint(exit_point, inside_offset);
+
 		}
+
+
+		static bool ComputeNextEntryExitPointForOuter_Richard(double toolpath_size, std::vector<Vector2d> &outside_offset, std::vector<Vector2d> &inside_offset,
+			Vector2d &entry_point, Vector2d &exit_point, Vector2d &next_entry_point, Vector2d &next_exit_point)
+		{
+			Vector2d n(exit_point[0] - entry_point[0], exit_point[1] - entry_point[1]);
+			Vector2d pn(-n[1], n[0]);
+
+			bool b0 = DetectNearestPoint(entry_point, Vector2d(entry_point[0] + pn[0], entry_point[1] + pn[1]), inside_offset, next_entry_point);
+			bool b1 = DetectNearestPoint(exit_point, Vector2d(exit_point[0] + pn[0], exit_point[1] + pn[1]), inside_offset, next_exit_point);
+
+			if (b0&&b1)
+			{
+				return true;
+			}
+			else
+			{
+				return false;
+			}
+		}
+
 
 		//	static void ComputeNextEntryExitPointForOuter(std::vector<Vector2d> &input_points, Vector2d &)
 
@@ -1412,6 +1579,24 @@ namespace hpcg {
 		{
 			double d = Circuit::FindNearestPointPar(v,input_points);
 			return Circuit::GetOnePointFromOffset(d,input_points);
+		}
+
+		static void FindNearestPoints(Vector2d &v, std::vector<Vector2d> &input_points, std::vector<Vector2d> &nearest_points)
+		{
+			double distance = Circuit::Distance(v, input_points);
+		
+			for (int i = 0; i < input_points.size(); i++)
+			{
+				Vector2d v0 = input_points[i];
+				Vector2d v1 = input_points[(i + 1) % input_points.size()];
+
+				double d = Strip::Distance(v, v0, v1);
+
+				if (abs(d - distance) < 0.0001)
+				{
+					nearest_points.push_back(Strip::FindNearestPoint(v, v0, v1));
+				}
+			}
 		}
 
 		static Vector2d FindNearestPoint(std::vector<Vector2d> &input_points, Vector2d &ray_start, Vector2d &ray_end)
@@ -1483,7 +1668,6 @@ namespace hpcg {
 						//if (temp >= 0)
 						//	entry_d_1 = temp;
 					}
-
 				}
 				else
 				{
@@ -1505,12 +1689,124 @@ namespace hpcg {
 				exit_p_1 = Circuit::GetOnePointFromOffset(exit_d_1, inside_offset);
 			}
 
+			next_entry_point = entry_p_1;
+			next_exit_point = exit_p_1;
+		}
 
+		static void ComputeNextEntryExitPointForInner_Richard(double toolpath_size, std::vector<Vector2d> &outside_offset, std::vector<Vector2d> &inside_offset,
+			Vector2d &entry_point, Vector2d &exit_point, Vector2d &next_entry_point, Vector2d &next_exit_point)
+		{
+			double entry_d_1 = Circuit::FindNearestPointPar(entry_point, inside_offset);
+			double exit_d_1 = Circuit::FindNearestPointPar(exit_point, inside_offset);
 
+			Vector2d entry_p_1 = Circuit::GetOnePointFromOffset(entry_d_1, inside_offset);
+			Vector2d exit_p_1 = Circuit::GetOnePointFromOffset(exit_d_1, inside_offset);
+
+			//handle the case where the next_exit_d_0 and next_entry_d_0 meets each other
+
+			int index_0 = Strip::CheckSamePoint(entry_p_1, inside_offset);
+			int index_1 = Strip::CheckSamePoint(exit_p_1, inside_offset);
+
+			//if (abs(entry_d_1 - exit_d_1) < 0.00001)
+			if (index_0 >= 0 || index_1 >= 0)
+			{
+				Vector2d n_0(entry_point[0] - entry_p_1[0], entry_point[1] - entry_p_1[1]);
+				Vector2d n_1(exit_point[0] - entry_p_1[0], exit_point[1] - entry_p_1[1]);
+
+				if (n_0[0] * n_1[1] - n_0[1] * n_1[0]>0)
+				{
+					if (index_0 >= 0)
+					{
+						//double temp = Circuit::DeltaDistance(entry_d_1, toolpath_size, inside_offset);
+						double temp = DeltaDEuclideanDistance(entry_d_1, toolpath_size, inside_offset);
+						if (temp >= 0)
+							exit_d_1 = temp;
+					}
+					else
+					{
+						//double temp = Circuit::DeltaDistance(exit_d_1, -toolpath_size, inside_offset);
+						//if (temp >= 0)
+						//	entry_d_1 = temp;
+					}
+				}
+				else
+				{
+					if (index_1 >= 0)
+					{
+						//double temp = Circuit::DeltaDistance(exit_d_1, toolpath_size, inside_offset);
+						double temp = DeltaDEuclideanDistance(exit_d_1, toolpath_size, inside_offset);
+						if (temp >= 0)
+							entry_d_1 = temp;
+					}
+					else
+					{
+						//	double temp = Circuit::DeltaDistance(entry_d_1, -toolpath_size, inside_offset);
+						//	if (temp >= 0)
+						//	exit_d_1 = temp;
+					}
+
+				}
+				entry_p_1 = Circuit::GetOnePointFromOffset(entry_d_1, inside_offset);
+				exit_p_1 = Circuit::GetOnePointFromOffset(exit_d_1, inside_offset);
+			}
 
 			next_entry_point = entry_p_1;
 			next_exit_point = exit_p_1;
 		}
+
+
+
+		static void ComputeNextEntryExitPointForInner_Update_Richard(int index, double toolpath_size, std::vector<Vector2d> &outside_offset, std::vector<Vector2d> &inside_offset,
+			Vector2d &entry_point, Vector2d &exit_point, Vector2d &update_entry_point, Vector2d &update_exit_point)
+		{
+			double entry_d_1 = Circuit::FindNearestPointPar(entry_point, inside_offset);
+			double exit_d_1 = Circuit::FindNearestPointPar(exit_point, inside_offset);
+
+			Vector2d entry_p_1 = Circuit::GetOnePointFromOffset(entry_d_1, inside_offset);
+			Vector2d exit_p_1 = Circuit::GetOnePointFromOffset(exit_d_1, inside_offset);
+
+			update_entry_point = entry_point;
+			update_exit_point = exit_point;
+
+			//handle the case where the next_exit_d_0 and next_entry_d_0 meets each other
+			int index_0 = Strip::CheckSamePoint(entry_p_1, inside_offset);
+			int index_1 = Strip::CheckSamePoint(exit_p_1, inside_offset);
+
+			//if (abs(entry_d_1 - exit_d_1) < 0.00001)
+			if (index_0 >= 0 && index_1 >= 0 && index_0 == index_1)
+			{
+				double temp = DeltaDEuclideanDistance(exit_d_1, toolpath_size, inside_offset);
+
+				if (temp >= 0)
+				{
+					double entry_d_0 = Circuit::FindNearestPointPar(entry_point, outside_offset);
+					double exit_d_0 = Circuit::FindNearestPointPar(exit_point, outside_offset);
+
+					std::vector<Vector2d> one_path_0;
+					std::vector<Vector2d> one_path_1;
+					Circuit::SelectOnePartOffset(outside_offset, entry_d_0, exit_d_0, one_path_0);
+					Circuit::SelectOnePartOffset(outside_offset, exit_d_0, entry_d_0, one_path_1);
+
+					if (Strip::GetTotalLength(one_path_0) < Strip::GetTotalLength(one_path_1))
+					{
+						//entry
+						Vector2d p = Circuit::GetOnePointFromOffset(temp, inside_offset);
+						double par = Circuit::FindNearestPointPar(p, outside_offset);
+						update_entry_point = Circuit::GetOnePointFromOffset(par, outside_offset);
+					}
+					else
+					{
+						//exit
+						Vector2d p = Circuit::GetOnePointFromOffset(temp, inside_offset);
+						double par = Circuit::FindNearestPointPar(p, outside_offset);
+						update_exit_point = Circuit::GetOnePointFromOffset(par, outside_offset);
+					}
+
+				}
+
+			}
+		}
+
 
 
 		//for fermat spiral generation
@@ -1755,7 +2051,6 @@ namespace hpcg {
 			std::vector<std::vector<Vector2d>> &offset_parts,
 			std::vector<Vector2d> &debug_points, std::vector<std::vector<Vector2d>> &debug_lines)
 		{
-			debug_lines.push_back(offset);
 
 			//get contour points
 			std::vector<std::vector<Vector2d>> contour_points;
@@ -1792,35 +2087,32 @@ namespace hpcg {
 					double d1 = abs(d0 - offset_distance);
 					if (d1<0.01)
 					{
-						offset_related_contour_index[i].push_back(j);
-						Vector2d v = Circuit::FindNearestPoint(offset[i], contour_points[j]);
-						offset_related_contour_point[i].push_back(v);
+						std::vector<Vector2d> ps;
+
+						Circuit::FindNearestPoints(offset[i], contour_points[j], ps);
+
+						for (int k = 0; k < ps.size(); k++)
+						{
+							offset_related_contour_point[i].push_back(ps[k]);
+							offset_related_contour_index[i].push_back(j);
+						}
+
+						std::vector<Vector2d>().swap(ps);
 					}
 				}
-				assert(offset_related_contour_index[i].size() == 1 || offset_related_contour_index[i].size() == 2);
-				if (offset_related_contour_index[i].size() == 2)
+
+				if (offset_related_contour_index[i].size() >= 2)
 				{
-					Vector2d v0 = offset_related_contour_point[i][0];
-					Vector2d v1 = offset_related_contour_point[i][1];
+					cutting_point_index.push_back(i);
 
-					if (Distance(v0, v1, offset) < 0.01)
+					for (int j = 0; j < offset_related_contour_point[i].size(); j++)
 					{
-						offset_related_contour_used[i] = false;
-					}
-					else
-					{
-						debug_points.push_back(offset[i]);
-						debug_points.push_back(v0);
-						debug_points.push_back(v1);
-
-						cutting_point_index.push_back(i);
 					}
 				}
 			}
 
 			//get the related parts
 			std::vector<std::vector<double>> offset_related_contour_parts(contour_points.size(), std::vector<double>());
-
 
 			if (cutting_point_index.size()==0)
 			{
@@ -1840,24 +2132,22 @@ namespace hpcg {
 
 						Vector2d start_index_point, next_index_point;
 
-						if (offset_related_contour_index[start_index][0] == related_index)
+						for (int j = 0; j < offset_related_contour_index[start_index].size(); j++)
 						{
-							start_index_point = offset_related_contour_point[start_index][0];
-						}
-						else
-						{
-							start_index_point = offset_related_contour_point[start_index][1];
+							if (offset_related_contour_index[start_index][j] == related_index)
+							{
+								start_index_point = offset_related_contour_point[start_index][j];
+							}
 						}
 
-
-						if (offset_related_contour_index[next_index][0] == related_index)
+						for (int j = 0; j < offset_related_contour_index[next_index].size(); j++)
 						{
-							next_index_point = offset_related_contour_point[next_index][0];
+							if (offset_related_contour_index[next_index][j] == related_index)
+							{
+								next_index_point = offset_related_contour_point[next_index][j];
+							}
 						}
-						else
-						{
-							next_index_point = offset_related_contour_point[next_index][1];
-						}
+					
 						offset_related_contour_parts[related_index].push_back(Circuit::FindNearestPointPar(next_index_point, contour_points[related_index]));
 						offset_related_contour_parts[related_index].push_back(Circuit::FindNearestPointPar(start_index_point, contour_points[related_index]));
 					}
@@ -1868,13 +2158,19 @@ namespace hpcg {
 			{
 				for (int j = 0; j < offset_related_contour_parts[i].size(); j = j + 2)
 				{
-					std::vector<Vector2d> one_path;
-					Circuit::SelectOnePartOffset(contour_points[i], offset_related_contour_parts[i][j], offset_related_contour_parts[i][j + 1], one_path);
-					//debug_lines.push_back(one_path);
-					offset_parts.push_back(one_path);
+					if (abs(offset_related_contour_parts[i][j]) < 0.00001&&abs(offset_related_contour_parts[i][j + 1]-1.0) < 0.00001)
+					{
+						offset_parts.push_back(contour_points[i]);
+					}
+					else
+					{
+						std::vector<Vector2d> one_path;
+						Circuit::SelectOnePartOffset(contour_points[i], offset_related_contour_parts[i][j], offset_related_contour_parts[i][j + 1], one_path);
+						offset_parts.push_back(one_path);
+					}
+				
 				}
 			}
-
 
 			std::vector<std::vector<double>>().swap(offset_related_contour_parts);
 			std::vector<int>().swap(cutting_point_index);
@@ -1887,9 +2183,29 @@ namespace hpcg {
 		static bool PointsOnSharingEdge(Vector2d v, std::vector<std::vector<Vector2d>> &offsets_parts_0,
 			std::vector<std::vector<Vector2d>> &offsets_parts_1 )
 		{
+			Vector2d p0 = Strip::FindNearestPoint(v, offsets_parts_0);
+			Vector2d p1 = Strip::FindNearestPoint(p0, offsets_parts_1);
+			double d = Strip::Distance(p1,p0);
+
+			return abs(d) < 0.001;
+		}
 
 
-			Circuit::FindNearestPoint()
+		static bool ConnectTwoTrunkNodes_Richard(double toolpath_size, std::vector<Vector2d> &offset0, std::vector<Vector2d> &offset1,
+			int trunk_node_index_0, int trunk_node_index_1,
+			TrunkNode &trunk_node_0, TrunkNode &trunk_node_1,
+			std::vector<Vector2d> &offsets_parts_0,
+			std::vector<Vector2d> &offsets_parts_1,
+			std::vector<Vector2d> &debug_points, std::vector<std::vector<Vector2d>> &debug_lines, int index)
+		{
+			bool b = false;
+			for (int i = 0; i < offsets_parts_0.size() && !b; i++)
+			{
+				double par = Circuit::FindNearestPointPar(offsets_parts_0[i], offset0);
+
+
+
+			}
 
 		}
 
@@ -1897,13 +2213,13 @@ namespace hpcg {
 		static bool ConnectTwoTrunkNodes(double toolpath_size, std::vector<Vector2d> &offset0, std::vector<Vector2d> &offset1,
 			int trunk_node_index_0, int trunk_node_index_1,
 			TrunkNode &trunk_node_0, TrunkNode &trunk_node_1,
-			std::vector<std::vector<Vector2d>> &offsets_parts_0,
-			std::vector<std::vector<Vector2d>> &offsets_parts_1,
-			std::vector<Vector2d> &debug_points, std::vector<std::vector<Vector2d>> &debug_lines)
+			std::vector<Vector2d> &offsets_parts_0,
+			std::vector<Vector2d> &offsets_parts_1,
+			std::vector<Vector2d> &debug_points, std::vector<std::vector<Vector2d>> &debug_lines,int index)
 		{
-			std::vector<std::vector<Vector2d>> offset_0_pathes;
-			std::vector<std::vector<Vector2d>> offset_1_pathes;
-			DetectSharingPart0(toolpath_size, offset0, offset1, offset_0_pathes, offset_1_pathes);
+			//std::vector<std::vector<Vector2d>> offset_0_pathes;
+			//std::vector<std::vector<Vector2d>> offset_1_pathes;
+		//	DetectSharingPart0(toolpath_size, offset0, offset1, offset_0_pathes, offset_1_pathes);
 
 
 			bool b = false;
@@ -1915,11 +2231,14 @@ namespace hpcg {
 				Vector2d v0 = GetOnePointFromOffset(cp_0, offset0);
 				Vector2d v1 = GetOnePointFromOffset(cp_1, offset0);
 
-				double d0 = Distance(v0, offset_0_pathes);
-				double d1 = Distance(v1, offset_0_pathes);
+				double d0 = Strip::Distance(v0, offsets_parts_0);
+				double d1 = Strip::Distance(v1, offsets_parts_0);
 
+				//bool b0 = PointsOnSharingEdge(v0, offsets_parts_0, offsets_parts_1);
+				//bool b1 = PointsOnSharingEdge(v1, offsets_parts_0, offsets_parts_1);
 
 				if (d0 < 0.00001&&d1 < 0.00001)
+				//if (b0&&b1)
 				{
 					double d00 = DeltaDEuclideanDistance(cp_0, toolpath_size, offset0);
 					Vector2d v00 = GetOnePointFromOffset(d00, offset0);
@@ -1957,10 +2276,13 @@ namespace hpcg {
 				Vector2d v0 = GetOnePointFromOffset(cp_0, offset1);
 				Vector2d v1 = GetOnePointFromOffset(cp_1, offset1);
 
+				double d0 = Strip::Distance(v0, offsets_parts_1);
+				double d1 = Strip::Distance(v1, offsets_parts_1);
 
-				double d0 = Distance(v0, offset_1_pathes);
-				double d1 = Distance(v1, offset_1_pathes);
+				//bool b0 = PointsOnSharingEdge(v0, offsets_parts_1, offsets_parts_0);
+				//bool b1 = PointsOnSharingEdge(v1, offsets_parts_1, offsets_parts_0);
 
+				//if (b0&&b1)
 				if (d0 < 0.00001&&d1 < 0.00001)
 				{
 
@@ -2003,9 +2325,13 @@ namespace hpcg {
 				Vector2d v0 = GetOnePointFromOffset(cp_0, offset0);
 				Vector2d v1 = GetOnePointFromOffset(cp_1, offset0);
 
-				double d0 = Distance(v0, offset_0_pathes);
-				double d1 = Distance(v1, offset_0_pathes);
+				double d0 = Strip::Distance(v0, offsets_parts_0);
+				double d1 = Strip::Distance(v1, offsets_parts_0);
 
+				//bool b0 = PointsOnSharingEdge(v0, offsets_parts_0, offsets_parts_1);
+				//bool b1 = PointsOnSharingEdge(v1, offsets_parts_0, offsets_parts_1);
+
+				//if (b0&&b1)
 				if (d0 < 0.00001&&d1 < 0.00001)
 				{
 					double d00 = DeltaDEuclideanDistance(cp_0, toolpath_size, offset0);
@@ -2046,9 +2372,17 @@ namespace hpcg {
 				Vector2d v1 = GetOnePointFromOffset(cp_1, offset1);
 
 
-				double d0 = Distance(v0, offset_1_pathes);
-				double d1 = Distance(v1, offset_1_pathes);
+				//double d0 = Distance(v0, offset_1_pathes);
+				//double d1 = Distance(v1, offset_1_pathes);
 
+				double d0 = Strip::Distance(v0, offsets_parts_1);
+				double d1 = Strip::Distance(v1, offsets_parts_1);
+
+
+				//bool b0 = PointsOnSharingEdge(v0, offsets_parts_1, offsets_parts_0);
+				//bool b1 = PointsOnSharingEdge(v1, offsets_parts_1, offsets_parts_0);
+				
+				//if (b0&&b1)
 				if (d0 < 0.00001&&d1 < 0.00001)
 				{
 
@@ -2083,8 +2417,8 @@ namespace hpcg {
 			}
 
 
-			std::vector<std::vector<Vector2d>>().swap(offset_0_pathes);
-			std::vector<std::vector<Vector2d>>().swap(offset_1_pathes);
+			//std::vector<std::vector<Vector2d>>().swap(offset_0_pathes);
+			//std::vector<std::vector<Vector2d>>().swap(offset_1_pathes);
 
 			return b;
 		}

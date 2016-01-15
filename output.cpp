@@ -378,7 +378,7 @@ namespace hpcg {
 
 	}
 
-	void ToolpathGenerator::OutputPath(std::vector<Vector2d> &vecs, std::string path)
+	void ToolpathGenerator::OutputPathDirectly(std::vector<Vector2d> &vecs, std::string path)
 	{
 		std::vector<int> remove_int;
 
@@ -401,13 +401,56 @@ namespace hpcg {
 
 		std::ofstream file(path);
 
+		if (file.is_open())
+		{
+			file << "1" << std::endl;
+			file << vecs.size() << std::endl;
+			for (int i = 0; i < vecs.size(); i++)
+			{
+				file << vecs[i][0] << " " << vecs[i][1] << std::endl;
+			}
+		}
+		file.clear();
+		file.close();
+	}
+
+	void ToolpathGenerator::OutputPath(std::vector<Vector2d> &vecs, std::string path)
+	{
+		/*
+		std::vector<int> remove_int;
+
+		if (vecs.size() > 2)
+		{
+			for (int i = 0; i < vecs.size() - 1; i++)
+			{
+				double d = Strip::Distance(vecs[i], vecs[(i + 1) % vecs.size()]);
+				if (d < 0.00001)
+				{
+					remove_int.push_back((i + 1) % vecs.size());
+				}
+			}
+
+			for (int i = remove_int.size() - 1; i >= 0; i--)
+			{
+				vecs.erase(vecs.begin() + remove_int[i]);
+			}
+		}
+		*/
+
+		std::ofstream file(path);
+
 		double scale = input_toolpath_size / toolpath_size;
 
 		if (file.is_open())
 		{
+			file << "1" << std::endl;
+			file << vecs.size() << std::endl;
 			for (int i = 0; i < vecs.size(); i++)
 			{
-				file << vecs[i][0] * scale << " " << vecs[i][1] * scale << std::endl;
+				if (one_single_path_boundary[i])
+					file << vecs[i][0] * scale << " " << vecs[i][1] * scale <<" 1"<< std::endl;
+					else
+					file << vecs[i][0] * scale << " " << vecs[i][1] * scale <<" 0"<< std::endl;
 			}
 		}
 		file.clear();

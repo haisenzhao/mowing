@@ -47,6 +47,10 @@ namespace hpcg {
 		draw_turning_points = true;
 		draw_spiral = true;
 
+		graph_scale = 4.5;
+		graph_move_x = 1.0;
+		graph_move_y = 0.1;
+
 		line_width = 5;
 		point_size = 5;
 
@@ -86,6 +90,15 @@ namespace hpcg {
 		file >> debug_int_2;
 
 		file >> str;
+		file >> graph_scale;
+
+		file >> str;
+		file >> graph_move_x;
+
+		file >> str;
+		file >> graph_move_y;
+
+		file >> str;
 		file >> load_path;
 
 		file >> str;
@@ -93,7 +106,6 @@ namespace hpcg {
 
 		file >> str;
 		file >> draw_turning_points;
-
 
 		file >> str;
 		file >> draw_offsets;
@@ -162,7 +174,6 @@ namespace hpcg {
 	
 		image_space.toolpath_size = toolpath_size;
 
-
 		//FillingAlgorithm();
 		//FermatSpiral();
 
@@ -173,7 +184,35 @@ namespace hpcg {
 		if (work_model == 2)
 		{
 
-			ArchinedeanSpiral(contour);
+			FermatSpiral(contour, entry_d_0, exit_d_0);
+			//ArchinedeanSpiral(contour);
+
+			std::vector<Vector2d>().swap(one_single_path);
+
+			for (int i = 0; i < entry_spiral.size(); i++)
+			{
+				one_single_path.push_back(entry_spiral[i]);
+			}
+
+			for (int i = exit_spiral.size() - 1; i >= 0; i--)
+			{
+				one_single_path.push_back(exit_spiral[i]);
+			}
+
+			std::vector<Vector2d> temp;
+			for (int i = 0; i < one_single_path.size(); i++)
+			{
+				temp.push_back(one_single_path[i]);
+			}
+
+			std::vector<Vector2d>().swap(one_single_path);
+			for (int i = 0; i < 2000; i++)
+			{
+				one_single_path.push_back(Strip::GetOnePointFromStrip((double)i / 2000.0, temp));
+			}
+
+			OutputPath(one_single_path, output_str + ".dat");
+			Output_Obj_1(output_str + ".obj");
 		}
 
 		if (work_model == 3)
@@ -203,12 +242,26 @@ namespace hpcg {
 		{
 			FillingAlgorithmBasedOnOffsets();
 
-			OutputPath(one_single_path, output_str + ".dat");
+			if (one_single_path.size() != 0)
+			{
+				std::vector<Vector2d> temp;
+				for (int i = 0; i < one_single_path.size(); i++)
+				{
+					temp.push_back(one_single_path[i]);
+				}
 
-			Output_Obj_1(output_str + ".obj");
+				std::vector<Vector2d>().swap(one_single_path);
+				for (int i = 0; i <= 5999; i++)
+				{
+					one_single_path.push_back(Strip::GetOnePointFromStrip((double)i / 5999.0, temp));
+				}
+
+				BoundaryTag();
+
+				OutputPath(one_single_path, output_str + ".dat");
+				Output_Obj_1(output_str + ".obj");
+			}
 		}
-
-	
 
 		//ComputeOffsets_temp();
 		//OutputPath(one_single_path, output_str);
@@ -257,7 +310,7 @@ namespace hpcg {
 
 		double scale = (poly_contours.bbox().ymax() - poly_contours.bbox().ymin())>(poly_contours.bbox().xmax() - poly_contours.bbox().xmin()) ? 
 			(poly_contours.bbox().ymax() - poly_contours.bbox().ymin()) : (poly_contours.bbox().xmax() - poly_contours.bbox().xmin());
-		scale = scale /4.5;
+		scale = scale / graph_scale;
 
 		Polygon_2 one_contour;
 		for (Polygon_2::Vertex_iterator ver_iter = poly_contours.outer_boundary().vertices_begin(); ver_iter != poly_contours.outer_boundary().vertices_end(); ver_iter++)
@@ -270,8 +323,8 @@ namespace hpcg {
 			y = -y;
 			x = x / scale;
 			y = y / scale;
-			x += 1.0;
-			y += 0.1;
+			x += graph_move_x;
+			y += graph_move_y;
 			one_contour.push_back(Point_2(x,y));
 		}
 		contours = Polygon_with_holes(one_contour);
@@ -289,8 +342,8 @@ namespace hpcg {
 				y = -y;
 				x = x / scale;
 				y = y / scale;
-				x += 1.0;
-				y += 0.1;
+				x += graph_move_x;
+				y += graph_move_y;
 				one_contour.push_back(Point_2(x, y));
 			}
 			contours.add_hole(one_contour);
@@ -363,7 +416,6 @@ namespace hpcg {
 				}
 				glEnd();
 			}
-
 
 			if (debug_int_0 == 100)
 			{
@@ -447,7 +499,7 @@ namespace hpcg {
 
 			if (work_model == 7)
 			{
-				if (draw_spiral)
+				if (draw_spiral&&iiiiii % 2 == 0)
 				{
 					for (int i = 0; i < entry_spirals.size(); i++)
 					{
@@ -497,14 +549,43 @@ namespace hpcg {
 		//one_single_path
 		if (iiiiii % 2 == 1)
 		{
-			glLineWidth(line_width*1.2);
-			glColor3f(0.0, 0.0, 1.0);
-			glBegin(GL_LINE_STRIP);
-			for (int j = 0; j <one_single_path.size(); j++)
+			if (debug_int_0 == -2 && debug_int_2 == -2)
 			{
-				glVertex3f(one_single_path[j][0], one_single_path[j][1], 0.0);
+				glPointSize(point_size);
+				glColor3f(0.0, 0.0, 1.0);
+				glBegin(GL_POINTS);
+				for (int j = 0; j <one_single_path.size(); j++)
+				{
+					glVertex3f(one_single_path[j][0], one_single_path[j][1], 0.0);
+				}
+				glEnd();
 			}
-			glEnd();
+			else
+			{
+				glLineWidth(line_width*1.2);
+				glColor3f(0.0, 0.0, 1.0);
+				glBegin(GL_LINE_STRIP);
+				for (int j = 0; j <one_single_path.size(); j++)
+				{
+					glVertex3f(one_single_path[j][0], one_single_path[j][1], 0.0);
+				}
+				glEnd();
+
+				
+				if (one_single_path_boundary.size() != 0)
+				{
+					glPointSize(point_size);
+					glColor3f(1.0, 0.0, 0.0);
+					glBegin(GL_POINTS);
+					for (int j = 0; j <one_single_path.size(); j++)
+					{
+						if (one_single_path_boundary[j])
+							glVertex3f(one_single_path[j][0], one_single_path[j][1], 0.0);
+					}
+					glEnd();
+				}
+			}
+
 		}
 
 		//pathes_temp
@@ -538,7 +619,20 @@ namespace hpcg {
 		}
 
 
-		glPointSize(point_size*2);
+	
+		glLineWidth(line_width*2);
+		glColor3f(0.0, 0.0, 1.0);
+		for (int i = 0; i < debug_lines.size(); i++)
+		{
+			glBegin(GL_LINES);
+			for (int j = 0; j <debug_lines[i].size(); j++)
+			{
+				glVertex3f(debug_lines[i][j][0], debug_lines[i][j][1], 0.0);
+			}
+			glEnd();
+		}
+
+		glPointSize(point_size * 2);
 		glColor3f(0.0, 1.0, 1.0);
 		glBegin(GL_POINTS);
 		for (int j = 0; j < debug_points.size(); j++)
@@ -547,21 +641,6 @@ namespace hpcg {
 		}
 		glEnd();
 
-		glLineWidth(line_width*2);
-		glColor3f(0.0, 0.0, 1.0);
-
-		
-		for (int i = 0; i < debug_lines.size(); i++)
-		{
-			glBegin(GL_LINE_STRIP);
-			for (int j = 0; j <debug_lines[i].size(); j++)
-			{
-				glVertex3f(debug_lines[i][j][0], debug_lines[i][j][1], 0.0);
-			}
-			glEnd();
-		}
-
-	
 		if (draw_turning_points)
 		{
 			glPointSize(point_size);
