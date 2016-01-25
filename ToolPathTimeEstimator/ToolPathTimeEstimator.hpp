@@ -1,9 +1,11 @@
+#include "stdafx.h"
 #include <stdio.h>
 #include <iostream>
 #include <math.h>
 #include "Block.hpp"
 #include "Vector2D.hpp"
 #include "Config.h"
+
 
 class ToolPathTimeEstimator
 {
@@ -13,7 +15,7 @@ public:
 	double calculate(FILE * out);
 
 	void detail(FILE * out);
-
+	void timeline(FILE * out, float resolution);
 	void prepare();
 	void addJump(double x, double y);
 	void addBlock(double x, double y);
@@ -22,8 +24,8 @@ public:
     void backwardIterate(Block* blockPtr);
     void forwardIterate(Block* blockPtr);
 	Vector2D calcAllowedSpeed(double acceleration, double target_speed, Vector2D length);
-	
 	double length;
+	void updateNominalSpeed();
 	Vector2D nominal_speed;
     Vector2D allow_speed;
 	Vector2D acceleration;

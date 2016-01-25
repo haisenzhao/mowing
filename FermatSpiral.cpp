@@ -806,21 +806,30 @@ namespace hpcg {
 		entry_d_0 = Circuit::FindNearestPointPar(input_entry_point, local_offsets[0]);
 		exit_d_0 = Circuit::FindNearestPointPar(input_exit_point, local_offsets[0]);
 
-
 		if (local_offsets.size() == 1)
 		{
 			Vector2d entry_p_0 = Circuit::GetOnePointFromOffset(entry_d_0, local_offsets[0]);
 			Vector2d exit_p_0 = Circuit::GetOnePointFromOffset(exit_d_0, local_offsets[0]);
 
+			double entry_d_1 = Circuit::DeltaDEuclideanDistance(exit_d_0, toolpath_size, local_offsets[0]);
+
+			Vector2d entry_p_d = Circuit::GetOnePointFromOffset(entry_d_1, local_offsets[0]);
+			
+			one_single_path_turning_point.push_back(entry_p_0);
+			one_single_path_turning_point.push_back(exit_p_0);
+
 			exit_spiral.push_back(exit_p_0);
 
 			std::vector<Vector2d> vecs0;
-			Circuit::SelectOnePartOffset(local_offsets[0], entry_d_0, exit_d_0, vecs0);
+			Circuit::SelectOnePartOffset(local_offsets[0], entry_d_0, entry_d_1, vecs0);
 
-			for (int i = 0; i < vecs0.size() - 1; i++)
+			for (int i = 0; i < vecs0.size(); i++)
 			{
 				entry_spiral.push_back(vecs0[i]);
 			}
+
+			output_entry_point = exit_p_0;
+			output_exit_point = entry_p_d;
 
 			return;
 		}
@@ -884,11 +893,7 @@ namespace hpcg {
 			Circuit::ComputeNextEntryExitPointForInner_Update_Richard(i,toolpath_size, local_offsets[i], local_offsets[i + 1], entry_p_1, exit_p_1,
 				update_entry_point, update_exit_point);
 
-			std::vector<Vector2d>().swap(debug_points);
-
-			debug_points.push_back(entry_p_1);
-			//debug_points.push_back(exit_p_1);
-
+			
 			entry_d_1 = Circuit::FindNearestPointPar(update_entry_point, local_offsets[i]);
 			exit_d_1 = Circuit::FindNearestPointPar(update_exit_point, local_offsets[i]);
 
@@ -912,7 +917,6 @@ namespace hpcg {
 
 			std::vector<Vector2d>().swap(vecs0);
 			std::vector<Vector2d>().swap(vecs1);
-
 
 			//handle the case where the next_exit_d_0 and next_entry_d_0 meets each other
 			/*
@@ -966,6 +970,9 @@ namespace hpcg {
 			entry_p_1 = Circuit::GetOnePointFromOffset(entry_d_1, local_offsets[i]);
 			exit_p_1 = Circuit::GetOnePointFromOffset(exit_d_1, local_offsets[i]);
 
+			one_single_path_turning_point.push_back(entry_p_1);
+			one_single_path_turning_point.push_back(exit_p_1);
+
 			//select part
 			if (i % 2 == 0)
 			{
@@ -1004,6 +1011,7 @@ namespace hpcg {
 			return;
 		}
 
+		/*
 		std::vector<Vector2d> offset;
 		Circuit::GenerationOffsetWithClipper(local_offsets[local_offsets.size() - 1], toolpath_size / 2.0, offset);
 		if (offset.size() == 0)
@@ -1020,6 +1028,7 @@ namespace hpcg {
 			}
 			return;
 		}
+		*/
 
 
 		double entry_d_1, exit_d_1;

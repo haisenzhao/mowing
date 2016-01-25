@@ -45,6 +45,7 @@ typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
 typedef K::Point_2                    Point_2;
 typedef K::Line_2                     Line_2;
 typedef K::Segment_2                  Segment_2;
+typedef K::Ray_2                      Ray_2;
 typedef CGAL::Polygon_2<K>            Polygon_2;
 
 typedef CGAL::Straight_skeleton_2<K>  Ss;
@@ -193,10 +194,16 @@ namespace hpcg {
 		bool use_save_offset_file;
 		std::string offset_file;
 
+		std::string peter_data_path;
+
 		std::vector<Vector2d> one_single_path;
 		std::vector<bool> one_single_path_boundary;
 
 		std::vector<std::vector<Vector2d>> boundary_path;
+
+		std::vector<Vector2d> one_single_path_turning_point;
+
+		bool smooth_boundary;
 
 		ImageSpace image_space;
 
@@ -219,7 +226,30 @@ namespace hpcg {
 		int debug_int_1;
 		int debug_int_2;
 
+		bool sampling_one_single_path;
+
 		std::vector<TrunkNode> trunk_nodes;
+
+
+		double contour_path_size;
+		double contour_color_r;
+		double contour_color_g;
+		double contour_color_b;
+
+		double filling_path_size;
+		double filling_color_r;
+		double filling_color_g;
+		double filling_color_b;
+
+		double entry_spiral_size;
+		double entry_spiral_color_r;
+		double entry_spiral_color_g;
+		double entry_spiral_color_b;
+
+		double exit_spiral_size;
+		double exit_spiral_color_r;
+		double exit_spiral_color_g;
+		double exit_spiral_color_b;
 
 	public:
 		
@@ -307,6 +337,8 @@ namespace hpcg {
 		void OutputPath(std::vector<Vector2d> &vecs, std::string path);
 		void OutputPathTwoCircles();
 
+		void InputOneSinglePath(std::string path);
+
 		void Output_tree(std::string path);
 		void Output_tree(std::vector<int> &nodes, std::vector<int> &edges, std::string path);
 		void Output_Offsetses(std::string path);
@@ -329,5 +361,6 @@ namespace hpcg {
 
 		void BoundaryTag();
 
+		void Draw_A_Line(Vector2d v0, Vector2d v1, double lenght, double color_r, double color_g, double color_b);
 	};
 }

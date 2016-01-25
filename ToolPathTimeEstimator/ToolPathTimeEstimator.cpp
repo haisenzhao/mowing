@@ -1,4 +1,4 @@
-#include "StdAfx.h"
+#include "stdafx.h"
 #include "ToolPathTimeEstimator.hpp"
 #define π 3.141592653
 
@@ -7,6 +7,7 @@ ToolPathTimeEstimator::ToolPathTimeEstimator() {
     this->blocks.blockHead = new Block(0.0, 0.0);
     this->blocks.blockTail = this->blocks.blockHead;
     this->acceleration = Vector2D(3000, 3000);
+	this->acceleration.direction = true;
     this->nominal_speed = Vector2D(DEFAULT_NOMINALSPEED, DEFAULT_NOMINALSPEED);
 	this->nominal_speed.direction = false;
 	this->jerk = Vector2D(20, 20);
@@ -29,6 +30,7 @@ void ToolPathTimeEstimator::addJump(double x, double y)
 	this->blocks.blockTail->next = T;
 	T->length = Vector2D(x - T->previous->x, y - T->previous->y);
 	T->nominal_speed = Vector2D(JUMPSPEED, JUMPSPEED);
+	T->jump = true;
 	this->blocks.blockTail = T;
 }
 
@@ -41,6 +43,7 @@ void ToolPathTimeEstimator::addBlock(double x, double y) {
     this->blocks.blockTail->next = T;
     T->length = Vector2D(x-T->previous->x, y-T->previous->y);
 	T->nominal_speed = this->nominal_speed;
+	T->jump = false;
 	this->blocks.blockTail = T;
 }
 
@@ -59,114 +62,149 @@ double ToolPathTimeEstimator::calculate(FILE * out) {
                 backwardIterate(blockPtr);
 			}
 			else {
-				exit(1);
+				forwardIterate(blockPtr);
 			}
-		}
-		blockPtr->build_time = calcBlockBuildTime(blockPtr);
-		blockPtr = blockPtr->next;
-	}
-
-	//Processing the n block
-	blockPtr->entry_speed = blockPtr->previous->exit_speed;
-	allow_speed = Vector2D::getVectorFromDirection(sqrt(2 * acceleration.maxAlongDirection(blockPtr->length)*blockPtr->length.value), blockPtr->length);
-	blockPtr->exit_speed = Vector2D(0, 0);
+        }
+        blockPtr->build_time = calcBlockBuildTime(blockPtr);
+        blockPtr = blockPtr->next;
+    }
+    
+    //Processing the n block
+    blockPtr->entry_speed = blockPtr->previous->exit_speed;
+    allow_speed = Vector2D::getVectorFromDirection(sqrt(2*acceleration.maxAlongDirection(blockPtr->length)*blockPtr->length.value), blockPtr->length);
+    blockPtr->exit_speed = Vector2D(0, 0);
 	if (blockPtr->exit_speed.value < calcAllowedSpeed(-acceleration.maxAlongDirection(blockPtr->length), blockPtr->entry_speed.value, blockPtr->length).value) {
 		allow_speed = Vector2D::getVectorFromDirection(sqrt(2 * acceleration.maxAlongDirection(blockPtr->length)*blockPtr->length.value + pow(blockPtr->exit_speed.value, 2)), blockPtr->length);
 		if (allow_speed.value < blockPtr->entry_speed.value) {
 			backwardIterate(blockPtr);
 		}
 		else {
-			exit(1);
-		}
-	}
-	blockPtr->build_time = calcBlockBuildTime(blockPtr);
-
-	//Sum up the build time
-	double buildTime = 0;
-	blockPtr = this->blocks.blockHead->next;
-	while (blockPtr->next != nullptr) {
-		blockPtr->build_time = calcBlockBuildTime(blockPtr);
-		buildTime += blockPtr->build_time;
-		length += blockPtr->length.value;
-		blockPtr = blockPtr->next;
-		fprintf(out, "%f, %f, %f, %f, %f, %f\n", blockPtr->x, blockPtr->y, blockPtr->entry_speed.value, blockPtr->exit_speed.value, blockPtr->length.value, blockPtr->build_time);
-	}
-
-	return buildTime;
-
-
-}
-
-double ToolPathTimeEstimator::calcBlockBuildTime(Block* blockPtr) {
-	if (blockPtr->length.value <= ((2 * pow(blockPtr->nominal_speed.maxAlongDirection(blockPtr->length), 2) - pow(blockPtr->entry_speed.value, 2) - pow(blockPtr->exit_speed.value, 2)) / 2 / acceleration.maxAlongDirection(blockPtr->length))) {
-		blockPtr->max_speed = Vector2D::getVectorFromDirection(sqrt((2 * acceleration.maxAlongDirection(blockPtr->length)*blockPtr->length.value + pow(blockPtr->exit_speed.value, 2) + pow(blockPtr->entry_speed.value, 2)) / 2), blockPtr->length);
-		return (2 * blockPtr->max_speed.value - blockPtr->entry_speed.value - blockPtr->exit_speed.value) / acceleration.maxAlongDirection(blockPtr->length);
-
-	}
-	else {
-		return (2 * blockPtr->nominal_speed.maxAlongDirection(blockPtr->length) - blockPtr->entry_speed.value - blockPtr->exit_speed.value) / acceleration.maxAlongDirection(blockPtr->length) + (blockPtr->length.value - (2 * pow(blockPtr->nominal_speed.maxAlongDirection(blockPtr->length), 2) - pow(blockPtr->entry_speed.value, 2) - pow(blockPtr->exit_speed.value, 2)) / 2 / acceleration.maxAlongDirection(blockPtr->length)) / blockPtr->nominal_speed.maxAlongDirection(blockPtr->length);
-	}
-}
-
-void ToolPathTimeEstimator::backwardIterate(Block *blockPtr) {
-	if (calcJunctionSpeed(blockPtr->previous, blockPtr).value < calcAllowedSpeed(-acceleration.maxAlongDirection(blockPtr->length), blockPtr->exit_speed.value, blockPtr->length).value) {
-		allow_speed = Vector2D::getVectorFromDirection(sqrt(2 * acceleration.maxAlongDirection(blockPtr->length)*blockPtr->length.value + pow(calcJunctionSpeed(blockPtr->previous, blockPtr).value, 2)), blockPtr->length);
-		if (allow_speed.value > Vector2D::getVectorFromDirection(nominal_speed.maxAlongDirection(blockPtr->length), blockPtr->length).value) {
-			allow_speed = Vector2D::getVectorFromDirection(nominal_speed.maxAlongDirection(blockPtr->length), blockPtr->length);
-		}
-		if (blockPtr->exit_speed.value <= allow_speed.value) {
-			return;
-		}
-		else {
 			forwardIterate(blockPtr);
 		}
 	}
-	else {
-		blockPtr->entry_speed = allow_speed;
-		blockPtr = blockPtr->previous;
-		blockPtr->exit_speed = Vector2D::getVectorFromDirection(allow_speed.value, blockPtr->length);
-		allow_speed = Vector2D::getVectorFromDirection(calcAllowedSpeed(acceleration.maxAlongDirection(blockPtr->length), blockPtr->exit_speed.value, blockPtr->length).value, blockPtr->length);
-		if (blockPtr->entry_speed.value <= allow_speed.value) {
-			return;
+    blockPtr->build_time = calcBlockBuildTime(blockPtr);
+    
+    //Sum up the build time
+    double buildTime = 0;
+    blockPtr = this->blocks.blockHead->next;
+    while (blockPtr->next != nullptr) {
+        blockPtr->build_time = calcBlockBuildTime(blockPtr);
+        buildTime += blockPtr->build_time;
+        length += blockPtr->length.value;
+        blockPtr = blockPtr->next;
+        fprintf(out, "%f, %f, %f, %f, %f, %f\n", blockPtr->x, blockPtr->y, blockPtr->entry_speed.value, blockPtr->exit_speed.value, blockPtr->length.value, blockPtr->build_time);
+    }
+    
+    return buildTime;
+    
+    
+}
+
+double ToolPathTimeEstimator::calcBlockBuildTime(Block* blockPtr) {
+    if (blockPtr->length.value <= ((2*pow(blockPtr->nominal_speed.maxAlongDirection(blockPtr->length),2)-pow(blockPtr->entry_speed.value,2)-pow(blockPtr->exit_speed.value,2))/2/acceleration.maxAlongDirection(blockPtr->length))) {
+        blockPtr->max_speed = Vector2D::getVectorFromDirection(sqrt((2*acceleration.maxAlongDirection(blockPtr->length)*blockPtr->length.value+pow(blockPtr->exit_speed.value, 2)+pow(blockPtr->entry_speed.value, 2))/2), blockPtr->length);
+		blockPtr->s1 = (blockPtr->entry_speed - blockPtr->max_speed).get_value() / acceleration.maxAlongDirection(blockPtr->direction);
+		blockPtr->s2 = 0;
+		blockPtr->s3 = (blockPtr->exit_speed - blockPtr->max_speed).get_value() / acceleration.maxAlongDirection(blockPtr->direction);
+
+		if (blockPtr->s3 < 0) {
+			blockPtr->s3 = 0;
 		}
-		backwardIterate(blockPtr);
-	}
+
+		if (blockPtr->s1 < 0) {
+			blockPtr->s1 = 0;
+		}
+
+        return (2*blockPtr->max_speed.value-blockPtr->entry_speed.value-blockPtr->exit_speed.value)/acceleration.maxAlongDirection(blockPtr->length);
+        
+    } else {
+		double time = (2 * blockPtr->nominal_speed.maxAlongDirection(blockPtr->length) - blockPtr->entry_speed.value - blockPtr->exit_speed.value) / acceleration.maxAlongDirection(blockPtr->length) + (blockPtr->length.value - (2 * pow(blockPtr->nominal_speed.maxAlongDirection(blockPtr->length), 2) - pow(blockPtr->entry_speed.value, 2) - pow(blockPtr->exit_speed.value, 2)) / 2 / acceleration.maxAlongDirection(blockPtr->length)) / blockPtr->nominal_speed.maxAlongDirection(blockPtr->length);
+		blockPtr->max_speed = Vector2D::getVectorFromDirection(nominal_speed.maxAlongDirection(blockPtr->length), blockPtr->length);
+		blockPtr->s1 = (blockPtr->entry_speed - blockPtr->max_speed).get_value() / acceleration.maxAlongDirection(blockPtr->direction);
+		blockPtr->s3 = (blockPtr->exit_speed - blockPtr->max_speed).get_value() / acceleration.maxAlongDirection(blockPtr->direction);
+		blockPtr->s2 = time - blockPtr->s1 - blockPtr->s2;
+		if (blockPtr->s3 < 0) {
+			blockPtr->s3 = 0;
+		}
+		if (blockPtr->s2 < 0) {
+			blockPtr->s2 = 0;
+		}
+		if (blockPtr->s1 < 0) {
+			blockPtr->s1 = 0;
+		}
+		return time;
+    }
+}
+
+void ToolPathTimeEstimator::backwardIterate(Block *blockPtr) {
+    if (calcJunctionSpeed(blockPtr->previous, blockPtr).value < calcAllowedSpeed(-acceleration.maxAlongDirection(blockPtr->length), blockPtr->exit_speed.value, blockPtr->length).value) {
+        allow_speed = Vector2D::getVectorFromDirection(sqrt(2*acceleration.maxAlongDirection(blockPtr->length)*blockPtr->length.value+pow(calcJunctionSpeed(blockPtr->previous, blockPtr).value, 2)), blockPtr->length);
+        if (allow_speed.value > Vector2D::getVectorFromDirection(nominal_speed.maxAlongDirection(blockPtr->length), blockPtr->length).value) {
+            allow_speed = Vector2D::getVectorFromDirection(nominal_speed.maxAlongDirection(blockPtr->length), blockPtr->length);
+        }
+        if (blockPtr->exit_speed.value<=allow_speed.value) {
+            return;
+        } else {
+            forwardIterate(blockPtr);
+        }
+    } else {
+        blockPtr->entry_speed = allow_speed;
+        blockPtr = blockPtr->previous;
+        blockPtr->exit_speed = Vector2D::getVectorFromDirection(allow_speed.value, blockPtr->length);
+        allow_speed = Vector2D::getVectorFromDirection(calcAllowedSpeed(acceleration.maxAlongDirection(blockPtr->length), blockPtr->exit_speed.value, blockPtr->length).value, blockPtr->length);
+        if (blockPtr->entry_speed.value<=allow_speed.value) {
+			return;
+        }
+        backwardIterate(blockPtr);
+    }
 }
 
 void ToolPathTimeEstimator::forwardIterate(Block *blockPtr) {
-
-	blockPtr->exit_speed = allow_speed;
-	blockPtr = blockPtr->next;
-	blockPtr->entry_speed = allow_speed;
-	allow_speed = Vector2D::getVectorFromDirection(sqrt(2 * acceleration.maxAlongDirection(blockPtr->length)*blockPtr->length.value + pow(blockPtr->entry_speed.value, 2)), blockPtr->length);
-	if (allow_speed.value > Vector2D::getVectorFromDirection(nominal_speed.maxAlongDirection(blockPtr->length), blockPtr->length).value) {
-		allow_speed = Vector2D::getVectorFromDirection(nominal_speed.maxAlongDirection(blockPtr->length), blockPtr->length);
-	}
-	if (blockPtr->exit_speed.value <= allow_speed.value) {
-		return;
-	}
-	forwardIterate(blockPtr);
-
+    
+    blockPtr->exit_speed = allow_speed;
+    blockPtr = blockPtr->next;
+    blockPtr->entry_speed = allow_speed;
+    allow_speed = Vector2D::getVectorFromDirection(sqrt(2*acceleration.maxAlongDirection(blockPtr->length)*blockPtr->length.value+pow(blockPtr->entry_speed.value, 2)), blockPtr->length);
+    if (allow_speed.value > Vector2D::getVectorFromDirection(nominal_speed.maxAlongDirection(blockPtr->length), blockPtr->length).value) {
+        allow_speed = Vector2D::getVectorFromDirection(nominal_speed.maxAlongDirection(blockPtr->length), blockPtr->length);
+    }
+    if (blockPtr->exit_speed.value<=allow_speed.value) {
+        return;
+    }
+    forwardIterate(blockPtr);
+    
 }
 
 Vector2D ToolPathTimeEstimator::calcAllowedSpeed(double acceleration, double initialSpeed, Vector2D length)
 {
-	return Vector2D::getVectorFromDirection(sqrt(2 * acceleration*length.value + initialSpeed*initialSpeed), length);
+	return Vector2D::getVectorFromDirection(sqrt(2*acceleration*length.value+initialSpeed*initialSpeed), length);
+}
+
+void ToolPathTimeEstimator::updateNominalSpeed()
+{
+	Block * blockPtr;
+	blockPtr = this->blocks.blockHead->next;
+	while (blockPtr->next != this->blocks.blockTail) {
+		if (blockPtr->jump) {
+			blockPtr->nominal_speed = Vector2D(JUMPSPEED, JUMPSPEED);
+		}
+		else {
+			blockPtr->nominal_speed = this->nominal_speed;
+		}
+		blockPtr = blockPtr->next;
+	}
 }
 
 
 
 Vector2D ToolPathTimeEstimator::calcJunctionSpeed(Block *A, Block *B) {
 	if (A == nullptr) {
-		A = new Block(0, 0);
-	}
+        A = new Block(0,0);
+    }
 	Vector2D A_speed, junctionSpeed;
 	double arc_cos, arc_cos_2;
 	A_speed = calcAllowedSpeed(acceleration.maxAlongDirection(A->length), A->entry_speed.value, A->length);
 	arc_cos = (A_speed*B->length) / (A_speed.value*B->length.value);
-	if (arc_cos < -1) {
-	arc_cos = -1;
-}
 	if (abs(arc_cos - 1) <= 1e-10) {
 		if (A_speed.value >= nominal_speed.maxAlongDirection(A->length)) {
 			return Vector2D::getVectorFromDirection(nominal_speed.maxAlongDirection(A->length), A->length);
@@ -198,7 +236,7 @@ void ToolPathTimeEstimator::detail(FILE * out) {
 			fprintf(out, "%f, %f, %f, %f, %f, %f\n", blockPtr->x, blockPtr->y, blockPtr->entry_speed.value, blockPtr->exit_speed.value, blockPtr->length.value, blockPtr->build_time);
 		}
 		else {
-			if (((nominal_speed.maxAlongDirection(blockPtr->length) - blockPtr->entry_speed.value) + (nominal_speed.maxAlongDirection(blockPtr->length) - blockPtr->exit_speed.value)) /
+			if (((blockPtr->nominal_speed.maxAlongDirection(blockPtr->length) - blockPtr->entry_speed.value) + (blockPtr->nominal_speed.maxAlongDirection(blockPtr->length) - blockPtr->exit_speed.value)) /
 				acceleration.maxAlongDirection(blockPtr->length) >= blockPtr->build_time + 1e-4) {
 				//can not reach the nominal speed or just reach the nominal speed in a very short time
 				if (blockPtr->entry_speed.value - blockPtr->exit_speed.value <= 1e-4) {
@@ -263,6 +301,116 @@ void ToolPathTimeEstimator::detail(FILE * out) {
 			buildTime += blockPtr->build_time;
 			length += blockPtr->length.value;
 			blockPtr = blockPtr->next;
+	}
+}
+
+void ToolPathTimeEstimator::timeline(FILE * out, float resolution)
+{
+	float time_counter = 0;
+	float tick = resolution;
+	double s1, s2, s3;
+	Block * blockPtr;
+	Vector2D pre_location;
+	Vector2D pre_speed;
+	blockPtr = this->blocks.blockHead;
+	s1 = blockPtr->s1;
+	s2 = blockPtr->s2;
+	s3 = blockPtr->s3;
+	blockPtr->build_time = this->calcBlockBuildTime(blockPtr);
+	while (blockPtr != this->blocks.blockTail) {
+		if (blockPtr->build_time < tick) {
+			tick -= blockPtr->build_time;
+			pre_location = Vector2D(blockPtr->x, blockPtr->y);
+			pre_speed = Vector2D(blockPtr->exit_speed);
+			blockPtr = blockPtr->next;
+			blockPtr->build_time = this->calcBlockBuildTime(blockPtr);
+			s1 = blockPtr->s1;
+			s2 = blockPtr->s2;
+			s3 = blockPtr->s3;
+
+		}
+		else {
+			if (s1 < tick) {
+				if (s1 == 0) {
+					if (s2 < tick) {
+						if (s2 == 0) {
+							if (s3 < tick) {
+								if (s3 == 0) {
+									//jump to next segment, almost impossible to reach this step
+									pre_location = Vector2D(blockPtr->x, blockPtr->y);
+									pre_speed = Vector2D(blockPtr->exit_speed);
+									blockPtr = blockPtr->next;
+									blockPtr->build_time = this->calcBlockBuildTime(blockPtr);
+									s1 = blockPtr->s1;
+									s2 = blockPtr->s2;
+									s3 = blockPtr->s3;
+								}
+								else {
+									//finish the last stage and jump
+									tick -= s3;
+									pre_location = Vector2D(blockPtr->x, blockPtr->y);
+									pre_speed = Vector2D(blockPtr->exit_speed);
+									blockPtr = blockPtr->next;
+									blockPtr->build_time = this->calcBlockBuildTime(blockPtr);
+									s1 = blockPtr->s1;
+									s2 = blockPtr->s2;
+									s3 = blockPtr->s3;
+								}
+							}
+							else {
+								//finish the tick in last stage
+								s3 -= tick;
+								auto speed = pre_speed - Vector2D::getVectorFromDirection(acceleration.maxAlongDirection(blockPtr->length)*tick, blockPtr->length);
+								auto location = pre_location + Vector2D::getVectorFromDirection((pre_speed.get_value() + speed.get_value())*tick / 2, blockPtr->length);
+								fprintf(out, "%f %f %f\n", location.x, location.y, speed.value);
+								pre_speed = speed;
+								pre_location = location;
+								tick = resolution;
+							}
+						}
+						else {
+							//finish second stage
+							auto speed = pre_speed - Vector2D::getVectorFromDirection(blockPtr->max_speed.value*s2, blockPtr->length);
+							auto location = pre_location + Vector2D::getVectorFromDirection((pre_speed.get_value() + speed.get_value())*s2 / 2, blockPtr->length);
+							pre_speed = speed;
+							pre_location = location;
+							tick -= s2;
+							s2 = 0;
+						}
+					}
+					else {
+						//finish the tick in second stage
+						s2 -= tick;
+						auto speed = pre_speed - Vector2D::getVectorFromDirection(blockPtr->max_speed.value*tick, blockPtr->length);
+						auto location = pre_location + Vector2D::getVectorFromDirection((pre_speed.get_value() + speed.get_value())*tick / 2, blockPtr->length);
+						fprintf(out, "%f %f %f\n", location.x, location.y, speed.value);
+						pre_speed = speed;
+						pre_location = location;
+						tick = resolution;
+					}
+				}
+				else {
+					//finish the first stage
+					auto speed = pre_speed + Vector2D::getVectorFromDirection(acceleration.maxAlongDirection(blockPtr->length)*s1, blockPtr->length);
+					auto location = pre_location + Vector2D::getVectorFromDirection((pre_speed.get_value() + speed.get_value())*s1 / 2, blockPtr->length);
+					pre_speed = speed;
+					pre_location = location;
+					tick -= s1;
+					s1 = 0;
+				}
+			}
+			else {
+				//finish tick in first stage
+				s1 -= tick;
+				auto speed = pre_speed - Vector2D::getVectorFromDirection(acceleration.maxAlongDirection(blockPtr->length)*tick, blockPtr->length);
+				auto location = pre_location + Vector2D::getVectorFromDirection((pre_speed.get_value() + speed.get_value())*tick / 2, blockPtr->length);
+				fprintf(out, "%f %f %f\n", location.x, location.y, speed.value);
+				pre_speed = speed;
+				pre_location = location;
+				tick = resolution;
+
+			}
+		}
 	}
 }
 

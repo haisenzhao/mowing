@@ -6,7 +6,7 @@
 //  Copyright © 2015年 Celr. All rights reserved.
 //
 
-#include "StdAfx.h"
+#include "stdafx.h"
 #include "Vector2D.hpp"
 
 
@@ -18,6 +18,11 @@ Vector2D::Vector2D(double x, double y) {
 }
 Vector2D::Vector2D() {
     
+}
+
+double Vector2D::get_value() {
+	this->value = sqrt(x*x + y*y);
+	return this->value;
 }
 
 double Vector2D::maxAlongDirection(Vector2D direction) {
@@ -58,8 +63,18 @@ Vector2D Vector2D::operator-(const Vector2D rhs) {
     return Vector2D(this->x-rhs.x, this->y-rhs.y);
 }
 
+Vector2D Vector2D::operator+(const Vector2D rhs)
+{
+	return Vector2D(this->x + rhs.x, this->y + rhs.y);
+}
+
 double Vector2D::operator*(const Vector2D rhs) {
     return this->x*rhs.x+this->y*rhs.y;
+}
+
+Vector2D Vector2D::operator*(const float rhs)
+{
+	return Vector2D(this->x*rhs, this->y*rhs);
 }
 
 Vector2D Vector2D::normalize() {

@@ -157,6 +157,7 @@ namespace hpcg {
 			contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
 		}
 
+		if (smooth_boundary)
 		DirectlyContourSmoothing(contour);
 		smooth_contour.push_back(contour);
 
@@ -291,10 +292,10 @@ namespace hpcg {
 			contour.push_back(Vector2d(ver_iter->x(), ver_iter->y()));
 		}
 
+		if (smooth_boundary)
 		ContourSmoothing(contour);
 		smooth_contour.push_back(contour);
 
-		
 		for (Polygon_with_holes::Hole_iterator hole_iter = contours.holes_begin(); hole_iter != contours.holes_end(); hole_iter++)
 		{
 			std::vector<Vector2d>().swap(contour);

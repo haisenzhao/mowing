@@ -9,6 +9,7 @@
 #ifndef Vector_hpp
 #define Vector_hpp
 
+#include "stdafx.h"
 #include <stdio.h>
 
 #endif /* Vector_hpp */

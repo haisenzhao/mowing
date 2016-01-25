@@ -62,6 +62,7 @@ namespace hpcg {
 
 	void ToolpathGenerator::Output_Obj_1(std::string path)
 	{
+		return;
 		std::ofstream file(path);
 
 		if (file.is_open())
@@ -351,7 +352,10 @@ namespace hpcg {
 			Circuit::FindOptimalEntryExitPoints(toolpath_size, offsets[0], input_entry_point, input_exit_point,debug_points);
 
 			//generate Fermat spiral
-			FermatsSpiralTrick(offsets, input_entry_point, input_exit_point, output_entry_point, output_exit_point);
+			//FermatsSpiralTrick(offsets, input_entry_point, input_exit_point, output_entry_point, output_exit_point);
+
+
+			RichardMethod(offsets, input_entry_point, input_exit_point, output_entry_point, output_exit_point);
 
 
 			entry_spirals.push_back(entry_spiral);
@@ -371,6 +375,20 @@ namespace hpcg {
 			{
 				one_single_path.push_back(exit_spiral[i]);
 			}
+
+			std::vector<Vector2d> temp;
+			for (int i = 0; i < one_single_path.size(); i++)
+			{
+				temp.push_back(one_single_path[i]);
+			}
+
+			std::vector<Vector2d>().swap(one_single_path);
+			for (int i = 0; i <= 10000; i++)
+			{
+				one_single_path.push_back(Strip::GetOnePointFromStrip((double)i / 10000.0, temp));
+			}
+
+			BoundaryTag();
 
 			OutputPath(one_single_path, path + ".dat");
 			Output_Obj_1(path + ".obj");
@@ -412,6 +430,25 @@ namespace hpcg {
 		}
 		file.clear();
 		file.close();
+	}
+
+
+	void ToolpathGenerator::InputOneSinglePath(std::string path)
+	{
+
+		double scale = toolpath_size / input_toolpath_size;
+
+		std::ifstream inputfile(path, std::ios::in);
+
+		int input_int;
+		inputfile >> input_int;
+
+		for (int i = 0; i < input_int; i++)
+		{
+			Vector2d v;
+			inputfile >> v[0]>>v[1];
+			one_single_path.push_back(Vector2d(v[0] * scale, v[1] * scale));
+		}
 	}
 
 	void ToolpathGenerator::OutputPath(std::vector<Vector2d> &vecs, std::string path)

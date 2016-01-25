@@ -78,12 +78,11 @@ namespace hpcg {
 				est.addBlock(path[i][0], path[i][1]);
 			}
 
-			
 			double time = est.calculate(out);
+
 			std::cout << iii << " : " << delta<<"mm :  time :" <<time<<"s" << std::endl;
 
 			file << delta << " " << time << " " << Strip::GetTotalLength(path) << std::endl;
-
 
 			OutputPathDirectly(path, "D:\\one_one.dat");
 
@@ -395,7 +394,6 @@ namespace hpcg {
 		}
 	}
 
-
 	void  ToolpathGenerator::FillingAlgorithmBasedOnOffsets()
 	{
 		for (int i = 0; i < smooth_number; i++)
@@ -403,7 +401,7 @@ namespace hpcg {
 			PolygonSmoothing();
 			DirectlyPolygonSmoothing();
 		}
-		
+
 		if (use_save_offset_file)
 		{
 			std::ifstream file(offset_file, std::ios::in);
@@ -449,13 +447,19 @@ namespace hpcg {
 
 		}
 
+		for (int i = 0; i < offsets.size(); i++)
+		{
+
+		}
+
+
+
 		//debug_lines.push_back(offsets[56]);
 
 		//std::vector<std::vector<Vector2d>> one_pathes;
 		//one_pathes.push_back(offsets[56]);
 
 		//Circuit::RemoveMinimalOffsets(one_pathes, toolpath_size);
-
 
 		if (debug_int_0 == 100)
 			return;
@@ -513,8 +517,8 @@ namespace hpcg {
 		{
 			Vector2d input_entry_point, input_exit_point;
 			Vector2d output_entry_point, output_exit_point;
-			//Circuit::FindOptimalEntryExitPoints(toolpath_size, offsets[0], input_entry_point, input_exit_point, debug_points);
-			Circuit::FindOptimalEntryExitPoints_Richard(toolpath_size, offsets[0], offsets[offsets.size()-1], input_entry_point, input_exit_point, debug_points);
+			Circuit::FindOptimalEntryExitPoints(toolpath_size, offsets[0], input_entry_point, input_exit_point, debug_points);
+			//Circuit::FindOptimalEntryExitPoints_Richard(toolpath_size, offsets[0], offsets[offsets.size()-1], input_entry_point, input_exit_point, debug_points);
 			
 			//generate Fermat spiral
 			RichardMethod(offsets, input_entry_point, input_exit_point, output_entry_point, output_exit_point);
@@ -558,6 +562,8 @@ namespace hpcg {
 					continue;
 			}
 
+			std::cout <<"decompose_offset index: " <<i << std::endl;
+
 			if (decompose_offset[i][0] == 0)
 			{
 				//get current offsets
@@ -571,8 +577,9 @@ namespace hpcg {
 
 				Vector2d input_entry_point, input_exit_point;
 				Vector2d output_entry_point, output_exit_point;
-				Circuit::FindOptimalEntryExitPoints(toolpath_size, offsets[decompose_offset[i][0]], input_entry_point, input_exit_point, debug_points);
+				//Circuit::FindOptimalEntryExitPoints(toolpath_size, offsets[decompose_offset[i][0]], input_entry_point, input_exit_point, debug_points);
 
+				Circuit::FindOptimalEntryExitPoints_Richard(toolpath_size, offsets0[0], offsets0[offsets0.size()-1], input_entry_point, input_exit_point, debug_points);
 
 				//generate Fermat spiral
 				RichardMethod(offsets0, input_entry_point, input_exit_point, output_entry_point, output_exit_point);
@@ -640,13 +647,17 @@ namespace hpcg {
 				int offsets_parts_index_0, offsets_parts_index_1;
 				GetSharingParts(decompose_offset[i][decompose_offset[i].size()-1], next_index, offsets_parts_index_0, offsets_parts_index_1);
 
-				Circuit::FindOptimalEntryExitPoints(toolpath_size, offsets0[0], offsets[next_index], offset_graph_sharing_parts[offsets_parts_index_0], offset_graph_sharing_parts[offsets_parts_index_1], input_entry_point, input_exit_point, debug_points);
+				//debug_lines.push_back(offset_graph_sharing_parts[offsets_parts_index_0]);
+				//debug_lines.push_back(offset_graph_sharing_parts[offsets_parts_index_1]);
+				Circuit::FindOptimalEntryExitPoints_Simple(toolpath_size, offsets0[0], offsets[next_index], offset_graph_sharing_parts[offsets_parts_index_0], offset_graph_sharing_parts[offsets_parts_index_1], input_entry_point, input_exit_point, debug_points);
+
+				//Circuit::FindOptimalEntryExitPoints_Richard(toolpath_size, offsets0[0], offsets[next_index], input_entry_point, input_exit_point, debug_points);
 
 				double d0 = Strip::Distance(input_entry_point, offset_graph_sharing_parts[offsets_parts_index_1]);
 				double d1 = Strip::Distance(input_exit_point, offset_graph_sharing_parts[offsets_parts_index_1]);
 
 				//debug_lines.push_back(offset_graph_sharing_parts[offsets_parts_index_0]);
-			//	debug_lines.push_back(offset_graph_sharing_parts[offsets_parts_index_1]);
+				//debug_lines.push_back(offset_graph_sharing_parts[offsets_parts_index_1]);
 
 				//generate Fermat spiral
 				RichardMethod(offsets0, input_entry_point, input_exit_point, output_entry_point, output_exit_point);
@@ -732,7 +743,6 @@ namespace hpcg {
 
 		do
 		{
-
 			bool goon = false;
 
 			for (int i = 0; i < connect_edges.size(); i = i + 2)
@@ -742,18 +752,33 @@ namespace hpcg {
 					int node_index_0 = connect_edges[i];
 					int node_index_1 = connect_edges[i + 1];
 
+					if ((node_index_0 == 12 && node_index_1 == 10) || (node_index_0 == 10 && node_index_1 == 12))
+					{
+						int dsd = 10;
+					}
+
 					int trunk_node_id_0 = GetTrunkNodeId(trunk_nodes, connect_edges[i]);
 					int trunk_node_id_1 = GetTrunkNodeId(trunk_nodes, connect_edges[i + 1]);
 
 					int offsets_parts_index_0, offsets_parts_index_1;
 					GetSharingParts(node_index_0, node_index_1, offsets_parts_index_0, offsets_parts_index_1);
 
+					if (node_index_0 == 3 && node_index_1 == 5)
+					{
+						//debug_lines.push_back(offset_graph_sharing_parts[offsets_parts_index_0]);
+						//debug_lines.push_back(offset_graph_sharing_parts[offsets_parts_index_1]);
+						int dsa = 10;
+					}
+
+
+				
 					bool b = Circuit::ConnectTwoTrunkNodes(toolpath_size, offsets[node_index_0], offsets[node_index_1],
 						trunk_node_id_0, trunk_node_id_1,
 						trunk_nodes[trunk_node_id_0], trunk_nodes[trunk_node_id_1],
 						offset_graph_sharing_parts[offsets_parts_index_0], offset_graph_sharing_parts[offsets_parts_index_1],
 						debug_points, debug_lines,i);
 					
+			
 					if (b)
 					{
 						connect_edeges_success[i / 2] = true;
@@ -778,7 +803,6 @@ namespace hpcg {
 			{
 				break;
 			}
-
 		} while (true);
 		//connecting others
 		bool goon = false;
@@ -807,7 +831,7 @@ namespace hpcg {
 					int offsets_parts_index_0, offsets_parts_index_1;
 					GetSharingParts(node_index_0, node_index_1, offsets_parts_index_0, offsets_parts_index_1);
 
-					bool b = Circuit::ConnectTwoTrunkNodes(toolpath_size, offsets[node_index_0], offsets[node_index_1],
+					bool b = Circuit::ConnectTwoTrunkNodes_Richard(toolpath_size, offsets[node_index_0], offsets[node_index_1],
 						trunk_node_id_0, trunk_node_id_1,
 						trunk_nodes[trunk_node_id_0], trunk_nodes[trunk_node_id_1],
 						offset_graph_sharing_parts[offsets_parts_index_0], offset_graph_sharing_parts[offsets_parts_index_1],
@@ -821,20 +845,7 @@ namespace hpcg {
 			}
 		}
 
-		
-
-
-
-
-
 		//connecting others
-
-
-
-
-
-
-
 
 		for (int i = 0; i < trunk_nodes.size(); i++)
 		{

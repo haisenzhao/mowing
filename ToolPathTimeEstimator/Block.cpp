@@ -1,5 +1,6 @@
-#include "StdAfx.h"
+#include "stdafx.h"
 #include "Block.hpp"
+
 
 Block::Block(double x, double y) {
     this->next = nullptr;
